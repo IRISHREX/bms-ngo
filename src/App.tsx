@@ -19,6 +19,8 @@ import VolunteerPage from "@/pages/public/VolunteerPage";
 
 // Admin
 import AdminLayout from "@/components/AdminLayout";
+import LoginPage from "@/pages/admin/LoginPage";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import Dashboard from "@/pages/admin/Dashboard";
 import FileManager from "@/pages/admin/FileManager";
 import GalleryManager from "@/pages/admin/GalleryManager";
@@ -53,8 +55,11 @@ const App = () => (
             <Route path="/volunteer" element={<VolunteerPage />} />
           </Route>
 
-          {/* Admin Routes */}
-          <Route path="/admin" element={<AdminLayout />}>
+          {/* Admin Login */}
+          <Route path="/admin/login" element={<LoginPage />} />
+
+          {/* Protected Admin Routes */}
+          <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
             <Route index element={<Dashboard />} />
             <Route path="files" element={<FileManager />} />
             <Route path="gallery" element={<GalleryManager />} />
