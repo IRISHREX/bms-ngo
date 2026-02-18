@@ -56,6 +56,18 @@ export default {
           "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
+          muted: "hsl(var(--sidebar-muted))",
+        },
+        chart: {
+          emerald: "hsl(var(--chart-emerald))",
+          blue: "hsl(var(--chart-blue))",
+          amber: "hsl(var(--chart-amber))",
+          rose: "hsl(var(--chart-rose))",
+          violet: "hsl(var(--chart-violet))",
+        },
+        stat: {
+          up: "hsl(var(--stat-up))",
+          down: "hsl(var(--stat-down))",
         },
       },
       borderRadius: {
