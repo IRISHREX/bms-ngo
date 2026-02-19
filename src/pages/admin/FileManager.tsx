@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { fetchFiles, formatFileSize, formatDate, type FileItem } from "@/lib/api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { deleteFile, fetchFiles, formatDate, formatFileSize, uploadFile, type FileItem } from "@/lib/api";
 import { FolderOpen, FileText, Image, Film, Upload, Trash2, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ const folderIcons: Record<string, React.ElementType> = { gallery: Image, reports
 const folderOptions = ["gallery", "reports", "certificates", "notices", "blog", "videos"];
 
 export default function FileManager() {
+  const queryClient = useQueryClient();
   const { data: files = [], isLoading } = useQuery({ queryKey: ["files"], queryFn: fetchFiles });
   const [search, setSearch] = useState("");
   const [activeFolder, setActiveFolder] = useState<string | null>(null);
@@ -22,6 +23,32 @@ export default function FileManager() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<FileItem | null>(null);
   const [uploadFolder, setUploadFolder] = useState("gallery");
+  const [usedIn, setUsedIn] = useState("Gallery");
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+
+  const uploadMutation = useMutation({
+    mutationFn: async ({ filesToUpload, folder, section }: { filesToUpload: File[]; folder: string; section: string }) => {
+      await Promise.all(filesToUpload.map((file) => uploadFile(file, folder, section)));
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["files"] });
+      toast({ title: "Upload complete", description: `${selectedFiles.length} file(s) uploaded to /${uploadFolder}` });
+      setUploadOpen(false);
+      setSelectedFiles([]);
+    },
+    onError: (error: Error) => toast({ title: "Upload failed", description: error.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteFile(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["files"] });
+      toast({ title: "File deleted", description: `"${deleteTarget?.name}" removed.` });
+      setDeleteOpen(false);
+      setDeleteTarget(null);
+    },
+    onError: (error: Error) => toast({ title: "Delete failed", description: error.message, variant: "destructive" }),
+  });
 
   const folders = [...new Set(files.map((f) => f.folder))];
   const filteredFiles = files.filter((f) => {
@@ -30,18 +57,27 @@ export default function FileManager() {
     return matchesSearch && matchesFolder;
   });
 
-  const folderCounts = folders.reduce((acc, folder) => { acc[folder] = files.filter((f) => f.folder === folder).length; return acc; }, {} as Record<string, number>);
+  const folderCounts = folders.reduce((acc, folder) => {
+    acc[folder] = files.filter((f) => f.folder === folder).length;
+    return acc;
+  }, {} as Record<string, number>);
 
-  const openDelete = (f: FileItem) => { setDeleteTarget(f); setDeleteOpen(true); };
+  const openDelete = (f: FileItem) => {
+    setDeleteTarget(f);
+    setDeleteOpen(true);
+  };
 
   const handleUpload = () => {
-    toast({ title: "File uploaded", description: `File uploaded to /${uploadFolder}` });
-    setUploadOpen(false);
+    if (selectedFiles.length === 0) {
+      toast({ title: "No files selected", description: "Select at least one file to upload.", variant: "destructive" });
+      return;
+    }
+    uploadMutation.mutate({ filesToUpload: selectedFiles, folder: uploadFolder, section: usedIn });
   };
 
   const handleDelete = () => {
-    toast({ title: "File deleted", description: `"${deleteTarget?.name}" removed. It was used in: ${deleteTarget?.usedIn}` });
-    setDeleteOpen(false);
+    if (!deleteTarget?.id) return;
+    deleteMutation.mutate(deleteTarget.id);
   };
 
   return (
@@ -110,49 +146,50 @@ export default function FileManager() {
         </table>
       </div>
 
-      {/* Upload Dialog */}
       <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Upload Files</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="space-y-2"><Label>Files</Label><Input type="file" multiple /></div>
+            <div className="space-y-2">
+              <Label>Files</Label>
+              <Input type="file" multiple onChange={(e) => setSelectedFiles(Array.from(e.target.files || []))} />
+            </div>
             <div className="space-y-2">
               <Label>Destination Folder</Label>
               <Select value={uploadFolder} onValueChange={setUploadFolder}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{folderOptions.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent>
+                <SelectContent>{folderOptions.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label>Used In Section</Label>
-              <Select defaultValue="Gallery">
+              <Select value={usedIn} onValueChange={setUsedIn}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {["Gallery", "Blog", "Projects", "Notices", "About Us", "Financial Transparency"].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  {["Gallery", "Blog", "Projects", "Notices", "About Us", "Financial Transparency"].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setUploadOpen(false)}>Cancel</Button>
-            <Button onClick={handleUpload}>Upload</Button>
+            <Button variant="outline" onClick={() => setUploadOpen(false)} disabled={uploadMutation.isPending}>Cancel</Button>
+            <Button onClick={handleUpload} disabled={uploadMutation.isPending}>{uploadMutation.isPending ? "Uploading..." : "Upload"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete with usage warning */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete File</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete "{deleteTarget?.name}"?
-              {deleteTarget?.usedIn && <><br /><br /><strong className="text-foreground">⚠ This file is currently used in: {deleteTarget.usedIn}</strong><br />Deleting it may cause broken images or missing documents on the site.</>}
+              {deleteTarget?.usedIn && <><br /><br /><strong className="text-foreground">This file is currently used in: {deleteTarget.usedIn}</strong><br />Deleting it may cause broken images or missing documents on the site.</>}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete Anyway</AlertDialogAction>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={deleteMutation.isPending}>Delete Anyway</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

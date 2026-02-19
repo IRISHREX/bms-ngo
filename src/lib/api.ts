@@ -18,6 +18,36 @@ export interface DashboardStats {
   villagesReached: number;
 }
 
+export interface RecentActivityItem {
+  type: "donation" | "volunteer" | "blog" | "gallery" | "notice" | "project";
+  text: string;
+  createdAt: string;
+}
+
+export interface TransparencyBreakdownItem {
+  key: string;
+  label: string;
+  amount: number;
+  pct: number;
+}
+
+export interface TransparencyReportItem {
+  id: string;
+  title: string;
+  type: string;
+  uploadedAt: string;
+  url: string;
+}
+
+export interface TransparencyData {
+  totalRaised: number;
+  totalDisbursed: number;
+  availableBalance: number;
+  totalProjects: number;
+  breakdown: TransparencyBreakdownItem[];
+  reports: TransparencyReportItem[];
+}
+
 export interface FileItem {
   id: string;
   name: string;
@@ -94,6 +124,15 @@ export interface Donation {
   campaign?: string;
 }
 
+export interface UserRecord {
+  id: string;
+  name: string;
+  email: string;
+  role: "super_admin" | "content_manager" | "finance_admin";
+  status: "active" | "inactive";
+  createdAt: string;
+}
+
 // ============ GENERIC HELPERS ============
 
 async function get<T>(url: string, authenticated = false): Promise<T> {
@@ -141,6 +180,14 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
 
 export async function updateImpactStats(data: { studentsHelped: number; mealsServed: number; villagesReached: number }) {
   return put("/stats/impact", data);
+}
+
+export async function fetchRecentActivity(): Promise<RecentActivityItem[]> {
+  return get<RecentActivityItem[]>("/stats/activity", true);
+}
+
+export async function fetchTransparencyData(): Promise<TransparencyData> {
+  return get<TransparencyData>("/stats/transparency");
 }
 
 // ============ FILES ============
@@ -283,6 +330,24 @@ export async function createDonation(data: Partial<Donation>) {
 
 export async function generateReceipt(id: string) {
   return post(`/donations/${id}/receipt`, {});
+}
+
+// ============ USERS ============
+
+export async function fetchUsers(): Promise<UserRecord[]> {
+  return get<UserRecord[]>("/users", true);
+}
+
+export async function createUser(data: { name: string; email: string; password: string; role: UserRecord["role"] }) {
+  return post("/users", data);
+}
+
+export async function updateUser(id: string, data: { role: UserRecord["role"]; status: UserRecord["status"] }) {
+  return put(`/users/${id}`, data);
+}
+
+export async function deleteUser(id: string) {
+  return del(`/users/${id}`);
 }
 
 // ============ HELPERS ============

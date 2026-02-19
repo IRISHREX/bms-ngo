@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { deleteGalleryItem, fetchGallery, updateGalleryItem, uploadGalleryPhotos, type GalleryItem } from "@/lib/api";
 import { Upload, Plus, Trash2, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,76 +11,140 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 
-const categories = ["All", "Events", "Beneficiaries", "Volunteers", "Field Visits"];
+const categories = [
+  { label: "All", value: "all" },
+  { label: "Events", value: "events" },
+  { label: "Beneficiaries", value: "beneficiaries" },
+  { label: "Volunteers", value: "volunteers" },
+  { label: "Field Visits", value: "field-visits" },
+] as const;
 
-interface GalleryItem { id: string; caption: string; category: string; }
+const categoryLabel = (value: string) => categories.find((c) => c.value === value)?.label || value;
 
-const mockGalleryItems: GalleryItem[] = [
-  { id: "1", caption: "Medical camp in Sundarbans", category: "Events" },
-  { id: "2", caption: "Students receiving books", category: "Beneficiaries" },
-  { id: "3", caption: "Volunteer orientation day", category: "Volunteers" },
-  { id: "4", caption: "Village survey - Bihar", category: "Field Visits" },
-  { id: "5", caption: "Food distribution drive", category: "Events" },
-  { id: "6", caption: "Women empowerment workshop", category: "Events" },
-];
-
-const emptyItem: Partial<GalleryItem> = { caption: "", category: "Events" };
+const emptyItem: Partial<GalleryItem> = { caption: "", category: "events" };
 
 export default function GalleryManager() {
-  const [activeCategory, setActiveCategory] = useState("All");
+  const queryClient = useQueryClient();
+  const { data: galleryItems = [], isLoading } = useQuery({ queryKey: ["gallery"], queryFn: fetchGallery });
+
+  const [activeCategory, setActiveCategory] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editing, setEditing] = useState<Partial<GalleryItem>>(emptyItem);
   const [deleteTarget, setDeleteTarget] = useState<GalleryItem | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
-  const filtered = activeCategory === "All" ? mockGalleryItems : mockGalleryItems.filter(g => g.category === activeCategory);
+  const filtered = activeCategory === "all" ? galleryItems : galleryItems.filter((g) => g.category === activeCategory);
 
-  const openCreate = () => { setEditing({ ...emptyItem }); setDialogOpen(true); };
-  const openEdit = (item: GalleryItem) => { setEditing({ ...item }); setDialogOpen(true); };
-  const openDelete = (item: GalleryItem) => { setDeleteTarget(item); setDeleteOpen(true); };
+  const uploadMutation = useMutation({
+    mutationFn: ({ files, category, caption }: { files: File[]; category: string; caption: string }) => uploadGalleryPhotos(files, category, caption),
+    onSuccess: async (_, vars) => {
+      await queryClient.invalidateQueries({ queryKey: ["gallery"] });
+      toast({ title: "Photos uploaded", description: `${vars.files.length} photo(s) uploaded.` });
+      setDialogOpen(false);
+      setSelectedFiles([]);
+    },
+    onError: (error: Error) => toast({ title: "Upload failed", description: error.message, variant: "destructive" }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, caption, category }: { id: string; caption: string; category: string }) => updateGalleryItem(id, { caption, category }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["gallery"] });
+      toast({ title: "Photo updated", description: `"${editing.caption}" saved.` });
+      setDialogOpen(false);
+    },
+    onError: (error: Error) => toast({ title: "Update failed", description: error.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteGalleryItem(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["gallery"] });
+      toast({ title: "Photo deleted", description: `"${deleteTarget?.caption}" removed.` });
+      setDeleteOpen(false);
+    },
+    onError: (error: Error) => toast({ title: "Delete failed", description: error.message, variant: "destructive" }),
+  });
+
+  const openCreate = () => {
+    setEditing({ ...emptyItem });
+    setSelectedFiles([]);
+    setDialogOpen(true);
+  };
+
+  const openEdit = (item: GalleryItem) => {
+    setEditing({ ...item });
+    setSelectedFiles([]);
+    setDialogOpen(true);
+  };
+
+  const openDelete = (item: GalleryItem) => {
+    setDeleteTarget(item);
+    setDeleteOpen(true);
+  };
 
   const handleSave = () => {
-    toast({ title: editing.id ? "Photo updated" : "Photo uploaded", description: `"${editing.caption}" saved.` });
-    setDialogOpen(false);
+    const caption = (editing.caption || "").trim();
+    const category = editing.category || "events";
+
+    if (editing.id) {
+      updateMutation.mutate({ id: editing.id, caption, category });
+      return;
+    }
+
+    if (selectedFiles.length === 0) {
+      toast({ title: "No files selected", description: "Select at least one photo to upload.", variant: "destructive" });
+      return;
+    }
+
+    uploadMutation.mutate({ files: selectedFiles, category, caption });
   };
 
   const handleDelete = () => {
-    toast({ title: "Photo deleted", description: `"${deleteTarget?.caption}" removed.` });
-    setDeleteOpen(false);
+    if (!deleteTarget?.id) return;
+    deleteMutation.mutate(deleteTarget.id);
   };
+
+  const busy = uploadMutation.isPending || updateMutation.isPending;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="page-header">Gallery Manager</h1>
-          <p className="page-description">{mockGalleryItems.length} photos across {categories.length - 1} categories</p>
+          <p className="page-description">{galleryItems.length} photos across {categories.length - 1} categories</p>
         </div>
         <Button className="gap-2" onClick={openCreate}><Upload className="w-4 h-4" /> Upload Photos</Button>
       </div>
 
       <div className="flex flex-wrap gap-2">
         {categories.map((cat) => (
-          <button key={cat} onClick={() => setActiveCategory(cat)}
-            className={`px-3 py-1.5 rounded-md text-sm transition-colors ${activeCategory === cat ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}>
-            {cat}
+          <button
+            key={cat.value}
+            onClick={() => setActiveCategory(cat.value)}
+            className={`px-3 py-1.5 rounded-md text-sm transition-colors ${activeCategory === cat.value ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
+          >
+            {cat.label}
           </button>
         ))}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map((item) => (
+        {isLoading ? Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="admin-card p-0 overflow-hidden animate-pulse"><div className="aspect-video bg-muted" /></div>
+        )) : filtered.map((item) => (
           <div key={item.id} className="admin-card p-0 overflow-hidden group">
-            <div className="aspect-video bg-muted flex items-center justify-center relative">
-              <span className="text-muted-foreground text-sm">Photo placeholder</span>
+            <div className="aspect-video bg-muted relative">
+              <img src={item.url} alt={item.caption || "Gallery image"} className="w-full h-full object-cover" />
               <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Button variant="secondary" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(item)}><Edit className="w-3.5 h-3.5" /></Button>
                 <Button variant="secondary" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => openDelete(item)}><Trash2 className="w-3.5 h-3.5" /></Button>
               </div>
             </div>
             <div className="p-3 space-y-1">
-              <p className="text-sm font-medium">{item.caption}</p>
-              <Badge variant="outline" className="text-xs">{item.category}</Badge>
+              <p className="text-sm font-medium">{item.caption || "Untitled"}</p>
+              <Badge variant="outline" className="text-xs">{categoryLabel(item.category)}</Badge>
             </div>
           </div>
         ))}
@@ -92,19 +158,21 @@ export default function GalleryManager() {
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>{editing.id ? "Edit Photo" : "Upload Photo"}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="space-y-2"><Label>Photo</Label><Input type="file" accept="image/*" /></div>
+            {!editing.id && (
+              <div className="space-y-2"><Label>Photo(s)</Label><Input type="file" accept="image/*" multiple onChange={(e) => setSelectedFiles(Array.from(e.target.files || []))} /></div>
+            )}
             <div className="space-y-2"><Label>Caption</Label><Input value={editing.caption ?? ""} onChange={(e) => setEditing({ ...editing, caption: e.target.value })} placeholder="Photo caption" /></div>
             <div className="space-y-2">
               <Label>Category</Label>
-              <Select value={editing.category ?? "Events"} onValueChange={(v) => setEditing({ ...editing, category: v })}>
+              <Select value={editing.category ?? "events"} onValueChange={(v) => setEditing({ ...editing, category: v as GalleryItem["category"] })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{categories.filter(c => c !== "All").map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                <SelectContent>{categories.filter((c) => c.value !== "all").map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave}>{editing.id ? "Update" : "Upload"}</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={busy}>Cancel</Button>
+            <Button onClick={handleSave} disabled={busy}>{editing.id ? "Update" : "Upload"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -117,7 +185,7 @@ export default function GalleryManager() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={deleteMutation.isPending}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

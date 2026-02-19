@@ -1,73 +1,72 @@
-# Welcome to your Lovable project
+# BMS NGO App
 
-## Project info
+Frontend: Vite + React
+Backend: Express + MySQL
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Local development
 
-## How can I edit this code?
+### 1. Create local database
 
-There are several ways of editing your application.
+```sql
+CREATE DATABASE ngo_db_local;
+```
 
-**Use Lovable**
+### 2. Configure backend env
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+`backend/.env` is already created for local dev with:
 
-Changes made via Lovable will be committed automatically to this repo.
+- `DB_HOST=127.0.0.1`
+- `DB_USER=root`
+- `DB_PASSWORD=`
+- `DB_NAME=ngo_db_local`
+- `PORT=5000`
+- `FRONTEND_URL=http://localhost:8080`
+- Seed admin:
+  - `ADMIN_SEED_EMAIL=Sohel.Islam@Ibm.com`
+  - `ADMIN_SEED_PASSWORD=Sohel@34892`
 
-**Use your preferred IDE**
+If your local MySQL uses a password, update `backend/.env`.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### 3. Configure frontend env
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+`/.env.local` is already created:
 
-Follow these steps:
+```env
+VITE_API_URL=http://localhost:5000/api
+```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### 4. Install dependencies
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+```bash
+npm install
+cd backend && npm install
+```
 
-# Step 3: Install the necessary dependencies.
-npm i
+### 5. Seed database
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
+cd backend
+node seed.js
+```
+
+### 6. Run app
+
+Terminal 1:
+
+```bash
+cd backend
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Terminal 2:
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```bash
+npm run dev
+```
 
-**Use GitHub Codespaces**
+Frontend: `http://localhost:8080`
+Backend health: `http://localhost:5000/api/health`
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Hostinger deployment
 
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+See `HOSTINGER_DEPLOYMENT.md` for step-by-step production setup and placeholders.

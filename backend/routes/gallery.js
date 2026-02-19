@@ -14,8 +14,11 @@ router.get("/", async (req, res) => {
        FROM gallery g LEFT JOIN files f ON g.file_id = f.id ORDER BY g.created_at DESC`
     );
     const items = rows.map((r) => ({
+      // Recover gracefully from historical folder mismatches by deriving folder from actual file_path.
+      // If file_path is missing, fall back to DB folder.
+      _folder: r.file_path ? path.basename(path.dirname(r.file_path)) : r.folder,
       id: String(r.id),
-      url: r.file_path ? `${uploadUrl()}/${r.folder}/${path.basename(r.file_path)}` : "",
+      url: r.file_path ? `${uploadUrl()}/${r._folder || "gallery"}/${path.basename(r.file_path)}` : "",
       caption: r.caption || "",
       category: r.category,
       uploadedAt: r.created_at,
@@ -27,19 +30,27 @@ router.get("/", async (req, res) => {
 });
 
 // POST /api/gallery (admin, multi-upload)
-router.post("/", verifyToken, upload.array("photos", 20), async (req, res) => {
+router.post(
+  "/",
+  verifyToken,
+  (req, _res, next) => {
+    req.uploadFolder = "gallery";
+    next();
+  },
+  upload.array("photos", 20),
+  async (req, res) => {
   try {
     const { category = "events", caption = "" } = req.body;
-    const folder = "gallery";
     const results = [];
 
     for (const file of req.files) {
+      const storedFolder = path.basename(path.dirname(file.path));
       const ext = path.extname(file.originalname).replace(".", "").toLowerCase();
       const type = ["jpg", "jpeg", "png", "gif", "webp"].includes(ext) ? "image" : ext;
 
       const [fileResult] = await db.query(
         "INSERT INTO files (name, type, size, folder, uploaded_by, used_in, file_path) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        [file.originalname, type, file.size, folder, req.user.name, "Gallery", file.path]
+        [file.originalname, type, file.size, storedFolder, req.user.name, "Gallery", file.path]
       );
 
       const [galleryResult] = await db.query(
@@ -49,7 +60,7 @@ router.post("/", verifyToken, upload.array("photos", 20), async (req, res) => {
 
       results.push({
         id: String(galleryResult.insertId),
-        url: `${uploadUrl()}/${folder}/${file.filename}`,
+        url: `${uploadUrl()}/${storedFolder}/${file.filename}`,
         caption,
         category,
         uploadedAt: new Date().toISOString(),
