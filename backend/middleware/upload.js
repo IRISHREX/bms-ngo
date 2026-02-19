@@ -6,7 +6,7 @@ const uploadDir = process.env.UPLOAD_DIR || path.join(__dirname, "..", "uploads"
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const folder = req.body.folder || "general";
+    const folder = req.uploadFolder || req.body.folder || "general";
     const dir = path.join(uploadDir, folder);
     fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
