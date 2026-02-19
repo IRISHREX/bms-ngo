@@ -1,6 +1,7 @@
-// API Service Layer
-// Replace BASE_URL with your actual backend URL
-const BASE_URL = "/api";
+// API Service Layer — wired to Express backend
+import { authHeaders, authHeadersMultipart } from "./auth";
+
+const BASE_URL = import.meta.env.VITE_API_URL || "/api";
 
 // ============ TYPES ============
 
@@ -93,99 +94,195 @@ export interface Donation {
   campaign?: string;
 }
 
-// ============ MOCK DATA ============
+// ============ GENERIC HELPERS ============
 
-const mockStats: DashboardStats = {
-  totalDonations: 1247,
-  totalVolunteers: 89,
-  totalPhotos: 248,
-  totalNotices: 35,
-  totalBlogPosts: 42,
-  totalProjects: 12,
-  donationAmount: 2450000,
-  studentsHelped: 3200,
-  mealsServed: 15000,
-  villagesReached: 45,
-};
+async function get<T>(url: string, authenticated = false): Promise<T> {
+  const res = await fetch(`${BASE_URL}${url}`, {
+    headers: authenticated ? authHeaders() : { "Content-Type": "application/json" },
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
 
-const mockFiles: FileItem[] = [
-  { id: "1", name: "annual-report-2024.pdf", type: "pdf", size: 2400000, folder: "reports", uploadedBy: "Admin", uploadedAt: "2024-12-15", usedIn: "Financial Transparency", url: "#" },
-  { id: "2", name: "camp-photo-01.jpg", type: "image", size: 540000, folder: "gallery", uploadedBy: "Field Team", uploadedAt: "2024-11-20", usedIn: "Gallery", url: "#" },
-  { id: "3", name: "80g-certificate.pdf", type: "pdf", size: 180000, folder: "certificates", uploadedBy: "Admin", uploadedAt: "2024-01-10", usedIn: "About Us", url: "#" },
-  { id: "4", name: "volunteer-drive-poster.png", type: "image", size: 320000, folder: "notices", uploadedBy: "Content Team", uploadedAt: "2025-01-05", usedIn: "Notices", url: "#" },
-  { id: "5", name: "education-program-report.pdf", type: "pdf", size: 1800000, folder: "reports", uploadedBy: "Admin", uploadedAt: "2024-09-30", usedIn: "Projects", url: "#" },
-];
+async function post<T>(url: string, body: unknown, authenticated = true): Promise<T> {
+  const res = await fetch(`${BASE_URL}${url}`, {
+    method: "POST",
+    headers: authenticated ? authHeaders() : { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
 
-const mockNotices: Notice[] = [
-  { id: "1", title: "Volunteer Drive - February 2025", description: "Join us for our monthly volunteer drive in rural West Bengal.", publishDate: "2025-02-01", expiryDate: "2025-02-28", pinned: true, status: "active" },
-  { id: "2", title: "Scholarship Applications Open", description: "Apply for the 2025 education scholarship program for underprivileged students.", publishDate: "2025-01-15", expiryDate: "2025-03-15", pinned: false, status: "active" },
-  { id: "3", title: "Medical Camp in Sundarbans", description: "Free medical checkup camp on March 5th, 2025.", publishDate: "2025-02-10", pinned: true, status: "active" },
-];
+async function put<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(`${BASE_URL}${url}`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
 
-const mockBlogPosts: BlogPost[] = [
-  { id: "1", title: "Meet Raju: First Graduate in His Village", content: "An inspiring story...", coverImage: "#", status: "published", tags: ["education", "success-story"], createdAt: "2025-01-20", updatedAt: "2025-01-20" },
-  { id: "2", title: "Medical Camp in West Bengal Report", content: "Our latest medical camp served...", coverImage: "#", status: "published", tags: ["health", "report"], createdAt: "2025-01-10", updatedAt: "2025-01-12" },
-  { id: "3", title: "How ₹500 Changed a Life", content: "A small donation, big impact...", status: "draft", tags: ["donation", "impact"], createdAt: "2025-02-01", updatedAt: "2025-02-01" },
-];
+async function del<T>(url: string): Promise<T> {
+  const res = await fetch(`${BASE_URL}${url}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
 
-const mockProjects: Project[] = [
-  { id: "1", title: "Rural Education Initiative", description: "Providing free education to 500+ students in 15 villages", location: "West Bengal", budget: 500000, fundsUsed: 380000, status: "ongoing", photos: [], createdAt: "2023-06-01" },
-  { id: "2", title: "Medical Camp Series", description: "Monthly medical camps in underserved areas", location: "Sundarbans", budget: 200000, fundsUsed: 200000, status: "completed", photos: [], createdAt: "2024-01-01" },
-  { id: "3", title: "Women Empowerment Program", description: "Skill development and micro-finance for rural women", location: "Bihar", budget: 350000, fundsUsed: 120000, status: "ongoing", photos: [], createdAt: "2024-06-01" },
-];
-
-const mockVolunteers: Volunteer[] = [
-  { id: "1", name: "Priya Sharma", phone: "+91-9876543210", email: "priya@email.com", message: "I want to teach rural students", type: "volunteer", status: "approved", createdAt: "2025-01-15" },
-  { id: "2", name: "TechCorp India", phone: "+91-1122334455", email: "csr@techcorp.com", message: "CSR partnership inquiry", type: "partner", status: "new", createdAt: "2025-02-10" },
-  { id: "3", name: "Ankit Verma", phone: "+91-9988776655", email: "ankit@college.edu", message: "Looking for summer internship", type: "intern", status: "contacted", createdAt: "2025-02-05" },
-];
-
-const mockDonations: Donation[] = [
-  { id: "1", donorName: "Rajesh Kumar", amount: 5000, date: "2025-02-15", paymentId: "pay_ABC123", receiptGenerated: true, type: "one-time" },
-  { id: "2", donorName: "Sunita Devi", amount: 1000, date: "2025-02-14", paymentId: "pay_DEF456", receiptGenerated: true, type: "monthly" },
-  { id: "3", donorName: "Anonymous", amount: 25000, date: "2025-02-10", paymentId: "pay_GHI789", receiptGenerated: false, type: "campaign", campaign: "School Building Fund" },
-  { id: "4", donorName: "Meera Patel", amount: 2000, date: "2025-02-08", paymentId: "pay_JKL012", receiptGenerated: true, type: "one-time" },
-];
-
-// ============ API FUNCTIONS ============
-// Replace these with actual fetch calls to your backend
-
-const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// ============ DASHBOARD ============
 
 export async function fetchDashboardStats(): Promise<DashboardStats> {
-  await delay(300);
-  // return fetch(`${BASE_URL}/stats`).then(r => r.json());
-  return mockStats;
+  return get<DashboardStats>("/stats");
 }
+
+export async function updateImpactStats(data: { studentsHelped: number; mealsServed: number; villagesReached: number }) {
+  return put("/stats/impact", data);
+}
+
+// ============ FILES ============
 
 export async function fetchFiles(): Promise<FileItem[]> {
-  await delay(300);
-  return mockFiles;
+  return get<FileItem[]>("/files", true);
 }
+
+export async function uploadFile(file: File, folder: string, usedIn: string): Promise<FileItem> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("folder", folder);
+  form.append("usedIn", usedIn);
+  const res = await fetch(`${BASE_URL}/files/upload`, {
+    method: "POST",
+    headers: authHeadersMultipart(),
+    body: form,
+  });
+  if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+  return res.json();
+}
+
+export async function deleteFile(id: string) {
+  return del(`/files/${id}`);
+}
+
+// ============ GALLERY ============
+
+export async function fetchGallery(): Promise<GalleryItem[]> {
+  return get<GalleryItem[]>("/gallery");
+}
+
+export async function uploadGalleryPhotos(files: File[], category: string, caption: string): Promise<GalleryItem[]> {
+  const form = new FormData();
+  files.forEach((f) => form.append("photos", f));
+  form.append("category", category);
+  form.append("caption", caption);
+  const res = await fetch(`${BASE_URL}/gallery`, {
+    method: "POST",
+    headers: authHeadersMultipart(),
+    body: form,
+  });
+  if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+  return res.json();
+}
+
+export async function updateGalleryItem(id: string, data: { caption: string; category: string }) {
+  return put(`/gallery/${id}`, data);
+}
+
+export async function deleteGalleryItem(id: string) {
+  return del(`/gallery/${id}`);
+}
+
+// ============ NOTICES ============
 
 export async function fetchNotices(): Promise<Notice[]> {
-  await delay(200);
-  return mockNotices;
+  return get<Notice[]>("/notices");
 }
+
+export async function fetchAdminNotices(): Promise<Notice[]> {
+  return get<Notice[]>("/notices/admin", true);
+}
+
+export async function createNotice(data: Partial<Notice>) {
+  return post("/notices", data);
+}
+
+export async function updateNotice(id: string, data: Partial<Notice>) {
+  return put(`/notices/${id}`, data);
+}
+
+export async function deleteNotice(id: string) {
+  return del(`/notices/${id}`);
+}
+
+// ============ BLOG ============
 
 export async function fetchBlogPosts(): Promise<BlogPost[]> {
-  await delay(200);
-  return mockBlogPosts;
+  return get<BlogPost[]>("/blog");
 }
+
+export async function fetchAdminBlogPosts(): Promise<BlogPost[]> {
+  return get<BlogPost[]>("/blog/admin", true);
+}
+
+export async function createBlogPost(data: Partial<BlogPost>) {
+  return post("/blog", data);
+}
+
+export async function updateBlogPost(id: string, data: Partial<BlogPost>) {
+  return put(`/blog/${id}`, data);
+}
+
+export async function deleteBlogPost(id: string) {
+  return del(`/blog/${id}`);
+}
+
+// ============ PROJECTS ============
 
 export async function fetchProjects(): Promise<Project[]> {
-  await delay(200);
-  return mockProjects;
+  return get<Project[]>("/projects");
 }
+
+export async function createProject(data: Partial<Project>) {
+  return post("/projects", data);
+}
+
+export async function updateProject(id: string, data: Partial<Project>) {
+  return put(`/projects/${id}`, data);
+}
+
+export async function deleteProject(id: string) {
+  return del(`/projects/${id}`);
+}
+
+// ============ VOLUNTEERS ============
 
 export async function fetchVolunteers(): Promise<Volunteer[]> {
-  await delay(200);
-  return mockVolunteers;
+  return get<Volunteer[]>("/volunteers", true);
 }
 
+export async function submitVolunteerForm(data: Partial<Volunteer>) {
+  return post("/volunteers", data, false);
+}
+
+export async function updateVolunteerStatus(id: string, status: string) {
+  return put(`/volunteers/${id}`, { status });
+}
+
+// ============ DONATIONS ============
+
 export async function fetchDonations(): Promise<Donation[]> {
-  await delay(200);
-  return mockDonations;
+  return get<Donation[]>("/donations", true);
+}
+
+export async function createDonation(data: Partial<Donation>) {
+  return post("/donations", data, false);
+}
+
+export async function generateReceipt(id: string) {
+  return post(`/donations/${id}/receipt`, {});
 }
 
 // ============ HELPERS ============
