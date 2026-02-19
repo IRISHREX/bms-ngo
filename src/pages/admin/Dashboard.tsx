@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchDashboardStats, formatCurrency } from "@/lib/api";
+import { fetchDashboardStats, fetchRecentActivity, formatCurrency } from "@/lib/api";
 import {
   IndianRupee,
   Users,
@@ -44,10 +44,31 @@ function StatCard({ title, value, icon: Icon, description, trend }: StatCardProp
   );
 }
 
+function formatRelativeTime(dateStr: string) {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diffMs = now - then;
+  const diffMin = Math.floor(diffMs / 60000);
+
+  if (diffMin < 1) return "just now";
+  if (diffMin < 60) return `${diffMin} min ago`;
+
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
+}
+
 export default function Dashboard() {
   const { data: stats, isLoading } = useQuery({
     queryKey: ["dashboard-stats"],
     queryFn: fetchDashboardStats,
+  });
+
+  const { data: recentActivity = [], isLoading: isActivityLoading } = useQuery({
+    queryKey: ["recent-activity"],
+    queryFn: fetchRecentActivity,
   });
 
   if (isLoading) {
@@ -75,7 +96,6 @@ export default function Dashboard() {
         <p className="page-description">Overview of your NGO operations</p>
       </div>
 
-      {/* Platform Stats */}
       <div>
         <h2 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wider">Platform</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
@@ -88,7 +108,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Impact Stats */}
       <div>
         <h2 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wider">Impact</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -99,21 +118,26 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Recent Activity placeholder */}
       <div className="admin-card">
         <h2 className="text-lg font-semibold mb-4">Recent Activity</h2>
         <div className="space-y-3">
-          {[
-            { text: "New donation of ₹5,000 from Rajesh Kumar", time: "2 hours ago" },
-            { text: "Volunteer application from Priya Sharma", time: "5 hours ago" },
-            { text: "Blog post 'Meet Raju' published", time: "1 day ago" },
-            { text: "Medical camp photos uploaded (12 files)", time: "2 days ago" },
-          ].map((item, i) => (
-            <div key={i} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-              <p className="text-sm text-foreground">{item.text}</p>
-              <span className="text-xs text-muted-foreground whitespace-nowrap ml-4">{item.time}</span>
+          {isActivityLoading && Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="py-2 border-b border-border last:border-0">
+              <div className="h-4 bg-muted rounded animate-pulse w-3/4 mb-2" />
+              <div className="h-3 bg-muted rounded animate-pulse w-24" />
             </div>
           ))}
+
+          {!isActivityLoading && recentActivity.map((item, i) => (
+            <div key={`${item.type}-${i}`} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+              <p className="text-sm text-foreground">{item.text}</p>
+              <span className="text-xs text-muted-foreground whitespace-nowrap ml-4">{formatRelativeTime(item.createdAt)}</span>
+            </div>
+          ))}
+
+          {!isActivityLoading && recentActivity.length === 0 && (
+            <p className="text-sm text-muted-foreground py-2">No recent activity yet.</p>
+          )}
         </div>
       </div>
     </div>

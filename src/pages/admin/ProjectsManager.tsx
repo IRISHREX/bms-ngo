@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { fetchProjects, formatCurrency, type Project } from "@/lib/api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createProject, deleteProject, fetchProjects, formatCurrency, updateProject, type Project } from "@/lib/api";
 import { Plus, Edit, MapPin, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,32 +16,93 @@ import { toast } from "@/hooks/use-toast";
 const emptyProject: Partial<Project> = { title: "", description: "", location: "", budget: 0, fundsUsed: 0, status: "planned" };
 
 export default function ProjectsManager() {
+  const queryClient = useQueryClient();
   const { data: projects = [], isLoading } = useQuery({ queryKey: ["projects"], queryFn: fetchProjects });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editing, setEditing] = useState<Partial<Project>>(emptyProject);
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
 
-  const openCreate = () => { setEditing({ ...emptyProject }); setDialogOpen(true); };
-  const openEdit = (p: Project) => { setEditing({ ...p }); setDialogOpen(true); };
-  const openDelete = (p: Project) => { setDeleteTarget(p); setDeleteOpen(true); };
+  const createMutation = useMutation({
+    mutationFn: createProject,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["projects"] });
+      toast({ title: "Project created", description: `"${editing.title}" saved.` });
+      setDialogOpen(false);
+    },
+    onError: (error: Error) => toast({ title: "Create failed", description: error.message, variant: "destructive" }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Project> }) => updateProject(id, data),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["projects"] });
+      toast({ title: "Project updated", description: `"${editing.title}" saved.` });
+      setDialogOpen(false);
+    },
+    onError: (error: Error) => toast({ title: "Update failed", description: error.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteProject(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["projects"] });
+      toast({ title: "Project deleted", description: `"${deleteTarget?.title}" removed.` });
+      setDeleteOpen(false);
+    },
+    onError: (error: Error) => toast({ title: "Delete failed", description: error.message, variant: "destructive" }),
+  });
+
+  const openCreate = () => {
+    setEditing({ ...emptyProject });
+    setDialogOpen(true);
+  };
+
+  const openEdit = (p: Project) => {
+    setEditing({ ...p });
+    setDialogOpen(true);
+  };
+
+  const openDelete = (p: Project) => {
+    setDeleteTarget(p);
+    setDeleteOpen(true);
+  };
 
   const handleSave = () => {
-    toast({ title: editing.id ? "Project updated" : "Project created", description: `"${editing.title}" saved.` });
-    setDialogOpen(false);
+    if (!editing.title?.trim() || !editing.location?.trim()) {
+      toast({ title: "Missing fields", description: "Title and location are required.", variant: "destructive" });
+      return;
+    }
+
+    const payload: Partial<Project> = {
+      title: editing.title.trim(),
+      description: (editing.description || "").trim(),
+      location: editing.location.trim(),
+      budget: Number(editing.budget || 0),
+      fundsUsed: Number(editing.fundsUsed || 0),
+      status: editing.status || "planned",
+    };
+
+    if (editing.id) {
+      updateMutation.mutate({ id: editing.id, data: payload });
+      return;
+    }
+    createMutation.mutate(payload);
   };
 
   const handleDelete = () => {
-    toast({ title: "Project deleted", description: `"${deleteTarget?.title}" removed.` });
-    setDeleteOpen(false);
+    if (!deleteTarget?.id) return;
+    deleteMutation.mutate(deleteTarget.id);
   };
+
+  const busy = createMutation.isPending || updateMutation.isPending;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="page-header">Projects</h1>
-          <p className="page-description">{projects.length} projects &middot; {projects.filter(p => p.status === "ongoing").length} ongoing</p>
+          <p className="page-description">{projects.length} projects � {projects.filter((p) => p.status === "ongoing").length} ongoing</p>
         </div>
         <Button className="gap-2" onClick={openCreate}><Plus className="w-4 h-4" /> New Project</Button>
       </div>
@@ -50,7 +111,8 @@ export default function ProjectsManager() {
         {isLoading
           ? Array.from({ length: 3 }).map((_, i) => <div key={i} className="admin-card animate-pulse"><div className="h-36 bg-muted rounded" /></div>)
           : projects.map((project) => {
-              const progress = Math.round((project.fundsUsed / project.budget) * 100);
+              const progressRaw = project.budget > 0 ? Math.round((project.fundsUsed / project.budget) * 100) : 0;
+              const progress = Math.max(0, Math.min(100, progressRaw));
               return (
                 <div key={project.id} className="admin-card space-y-4">
                   <div className="flex items-start justify-between">
@@ -92,14 +154,13 @@ export default function ProjectsManager() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Budget (₹)</Label><Input type="number" value={editing.budget ?? 0} onChange={(e) => setEditing({ ...editing, budget: Number(e.target.value) })} /></div>
-              <div className="space-y-2"><Label>Funds Used (₹)</Label><Input type="number" value={editing.fundsUsed ?? 0} onChange={(e) => setEditing({ ...editing, fundsUsed: Number(e.target.value) })} /></div>
+              <div className="space-y-2"><Label>Budget (INR)</Label><Input type="number" value={editing.budget ?? 0} onChange={(e) => setEditing({ ...editing, budget: Number(e.target.value) })} /></div>
+              <div className="space-y-2"><Label>Funds Used (INR)</Label><Input type="number" value={editing.fundsUsed ?? 0} onChange={(e) => setEditing({ ...editing, fundsUsed: Number(e.target.value) })} /></div>
             </div>
-            <div className="space-y-2"><Label>Photos</Label><Input type="file" accept="image/*" multiple /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave}>{editing.id ? "Update" : "Create"}</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={busy}>Cancel</Button>
+            <Button onClick={handleSave} disabled={busy}>{editing.id ? "Update" : "Create"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -108,11 +169,11 @@ export default function ProjectsManager() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Project</AlertDialogTitle>
-            <AlertDialogDescription>Are you sure you want to delete "{deleteTarget?.title}"? All associated files will also be removed.</AlertDialogDescription>
+            <AlertDialogDescription>Are you sure you want to delete "{deleteTarget?.title}"? This action cannot be undone.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={deleteMutation.isPending}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

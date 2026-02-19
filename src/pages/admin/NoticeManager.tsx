@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { fetchNotices, formatDate, type Notice } from "@/lib/api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createNotice, deleteNotice, fetchAdminNotices, formatDate, updateNotice, type Notice } from "@/lib/api";
 import { Pin, Plus, Edit, Trash2, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,29 +13,101 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 
-const emptyNotice: Partial<Notice> = { title: "", description: "", publishDate: new Date().toISOString().split("T")[0], pinned: false, status: "draft" };
+const emptyNotice: Partial<Notice> = {
+  title: "",
+  description: "",
+  publishDate: new Date().toISOString().split("T")[0],
+  pinned: false,
+  status: "draft",
+};
 
 export default function NoticeManager() {
-  const { data: notices = [], isLoading } = useQuery({ queryKey: ["notices"], queryFn: fetchNotices });
+  const queryClient = useQueryClient();
+  const { data: notices = [], isLoading } = useQuery({ queryKey: ["admin-notices"], queryFn: fetchAdminNotices });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editing, setEditing] = useState<Partial<Notice>>(emptyNotice);
   const [deleteTarget, setDeleteTarget] = useState<Notice | null>(null);
 
-  const openCreate = () => { setEditing({ ...emptyNotice }); setDialogOpen(true); };
-  const openEdit = (n: Notice) => { setEditing({ ...n }); setDialogOpen(true); };
-  const openDelete = (n: Notice) => { setDeleteTarget(n); setDeleteOpen(true); };
+  const invalidateNotices = async () => {
+    await queryClient.invalidateQueries({ queryKey: ["admin-notices"] });
+    await queryClient.invalidateQueries({ queryKey: ["notices"] });
+  };
+
+  const createMutation = useMutation({
+    mutationFn: createNotice,
+    onSuccess: async () => {
+      await invalidateNotices();
+      toast({ title: "Notice created", description: `"${editing.title}" saved successfully.` });
+      setDialogOpen(false);
+    },
+    onError: (error: Error) => toast({ title: "Create failed", description: error.message, variant: "destructive" }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Notice> }) => updateNotice(id, data),
+    onSuccess: async () => {
+      await invalidateNotices();
+      toast({ title: "Notice updated", description: `"${editing.title}" saved successfully.` });
+      setDialogOpen(false);
+    },
+    onError: (error: Error) => toast({ title: "Update failed", description: error.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteNotice(id),
+    onSuccess: async () => {
+      await invalidateNotices();
+      toast({ title: "Notice deleted", description: `"${deleteTarget?.title}" has been removed.` });
+      setDeleteOpen(false);
+      setDeleteTarget(null);
+    },
+    onError: (error: Error) => toast({ title: "Delete failed", description: error.message, variant: "destructive" }),
+  });
+
+  const openCreate = () => {
+    setEditing({ ...emptyNotice });
+    setDialogOpen(true);
+  };
+
+  const openEdit = (n: Notice) => {
+    setEditing({ ...n });
+    setDialogOpen(true);
+  };
+
+  const openDelete = (n: Notice) => {
+    setDeleteTarget(n);
+    setDeleteOpen(true);
+  };
 
   const handleSave = () => {
-    toast({ title: editing.id ? "Notice updated" : "Notice created", description: `"${editing.title}" saved successfully.` });
-    setDialogOpen(false);
+    if (!editing.title?.trim() || !editing.description?.trim()) {
+      toast({ title: "Missing fields", description: "Title and description are required.", variant: "destructive" });
+      return;
+    }
+
+    const payload: Partial<Notice> = {
+      title: editing.title.trim(),
+      description: editing.description.trim(),
+      publishDate: editing.publishDate,
+      expiryDate: editing.expiryDate || undefined,
+      pinned: !!editing.pinned,
+      status: editing.status || "draft",
+    };
+
+    if (editing.id) {
+      updateMutation.mutate({ id: editing.id, data: payload });
+      return;
+    }
+    createMutation.mutate(payload);
   };
 
   const handleDelete = () => {
-    toast({ title: "Notice deleted", description: `"${deleteTarget?.title}" has been removed.` });
-    setDeleteOpen(false);
-    setDeleteTarget(null);
+    if (!deleteTarget?.id) return;
+    deleteMutation.mutate(deleteTarget.id);
   };
+
+  const busy = createMutation.isPending || updateMutation.isPending;
 
   return (
     <div className="space-y-6">
@@ -73,13 +145,12 @@ export default function NoticeManager() {
             ))}
       </div>
 
-      {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>{editing.id ? "Edit Notice" : "New Notice"}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2"><Label>Title</Label><Input value={editing.title ?? ""} onChange={(e) => setEditing({ ...editing, title: e.target.value })} placeholder="Notice title" /></div>
-            <div className="space-y-2"><Label>Description</Label><Textarea value={editing.description ?? ""} onChange={(e) => setEditing({ ...editing, description: e.target.value })} placeholder="Describe the notice…" rows={3} /></div>
+            <div className="space-y-2"><Label>Description</Label><Textarea value={editing.description ?? ""} onChange={(e) => setEditing({ ...editing, description: e.target.value })} placeholder="Describe the notice..." rows={3} /></div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2"><Label>Publish Date</Label><Input type="date" value={editing.publishDate ?? ""} onChange={(e) => setEditing({ ...editing, publishDate: e.target.value })} /></div>
               <div className="space-y-2"><Label>Expiry Date</Label><Input type="date" value={editing.expiryDate ?? ""} onChange={(e) => setEditing({ ...editing, expiryDate: e.target.value })} /></div>
@@ -97,16 +168,14 @@ export default function NoticeManager() {
                 <Label>Pin Notice</Label>
               </div>
             </div>
-            <div className="space-y-2"><Label>Attachment</Label><Input type="file" /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave}>{editing.id ? "Update" : "Create"}</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={busy}>Cancel</Button>
+            <Button onClick={handleSave} disabled={busy}>{editing.id ? "Update" : "Create"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -115,7 +184,7 @@ export default function NoticeManager() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={deleteMutation.isPending}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
