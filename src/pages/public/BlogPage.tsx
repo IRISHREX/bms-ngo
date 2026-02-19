@@ -28,9 +28,13 @@ export default function BlogPage() {
                 transition={{ delay: i * 0.1 }}
                 className="admin-card space-y-3 cursor-pointer hover:shadow-lg transition-shadow"
               >
-                <div className="aspect-video bg-muted rounded-md flex items-center justify-center text-muted-foreground text-sm">
-                  Cover Image
-                </div>
+                {post.coverImage ? (
+                  <img src={post.coverImage} alt={post.title} className="aspect-video w-full object-cover rounded-md" />
+                ) : (
+                  <div className="aspect-video bg-muted rounded-md flex items-center justify-center text-muted-foreground text-sm">
+                    Cover Image
+                  </div>
+                )}
                 <div className="flex gap-2">
                   {post.tags.map((t) => <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>)}
                 </div>
