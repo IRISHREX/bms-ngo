@@ -108,15 +108,27 @@ async function seed() {
   // Seed impact stats
   await db.query("INSERT IGNORE INTO impact_stats (id, students_helped, meals_served, villages_reached) VALUES (1, 3200, 15000, 45)");
 
-  // Seed admin user (admin@ngo.org / admin123)
-  const hash = await bcrypt.hash("admin123", 10);
+  // Seed admin user (upsert by email so reruns refresh password/role)
+  const adminName = process.env.ADMIN_SEED_NAME || "Admin User";
+  const adminEmail = process.env.ADMIN_SEED_EMAIL || "admin@ngo.org";
+  const adminPassword = process.env.ADMIN_SEED_PASSWORD || "admin123";
+  const hash = await bcrypt.hash(adminPassword, 10);
   await db.query(
-    "INSERT IGNORE INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)",
-    ["Admin User", "admin@ngo.org", hash, "super_admin"]
+    `INSERT INTO users (name, email, password_hash, role, status)
+     VALUES (?, ?, ?, 'super_admin', 'active')
+     ON DUPLICATE KEY UPDATE
+       name = VALUES(name),
+       password_hash = VALUES(password_hash),
+       role = 'super_admin',
+       status = 'active'`,
+    [adminName, adminEmail, hash]
   );
 
-  console.log("✅ Database seeded! Admin: admin@ngo.org / admin123");
+  console.log(`Database seeded. Admin: ${adminEmail} / ${adminPassword}`);
   process.exit(0);
 }
 
-seed().catch((err) => { console.error(err); process.exit(1); });
+seed().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
