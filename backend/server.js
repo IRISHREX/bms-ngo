@@ -32,6 +32,7 @@ app.use("/api/projects", require("./routes/projects"));
 app.use("/api/volunteers", require("./routes/volunteers"));
 app.use("/api/donations", require("./routes/donations"));
 app.use("/api/users", require("./routes/users"));
+app.use("/api/theme", require("./routes/theme"));
 
 // Health check
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));

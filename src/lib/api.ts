@@ -133,6 +133,18 @@ export interface UserRecord {
   createdAt: string;
 }
 
+export interface ThemeOption {
+  themeKey: string;
+  label: string;
+  description: string;
+  sortOrder: number;
+}
+
+export interface ThemeState {
+  currentThemeKey: string;
+  themes: ThemeOption[];
+}
+
 // ============ GENERIC HELPERS ============
 
 async function get<T>(url: string, authenticated = false): Promise<T> {
@@ -348,6 +360,16 @@ export async function updateUser(id: string, data: { role: UserRecord["role"]; s
 
 export async function deleteUser(id: string) {
   return del(`/users/${id}`);
+}
+
+// ============ THEMES ============
+
+export async function fetchThemeState(): Promise<ThemeState> {
+  return get<ThemeState>("/theme");
+}
+
+export async function updateTheme(themeKey: string) {
+  return put("/theme", { themeKey });
 }
 
 // ============ HELPERS ============

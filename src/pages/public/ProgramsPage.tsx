@@ -1,58 +1,61 @@
-import { motion } from "framer-motion";
+﻿import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { GraduationCap, Stethoscope, UtensilsCrossed, Users, ArrowRight } from "lucide-react";
-
-const programs = [
-  {
-    id: "education",
-    title: "Education Program",
-    icon: GraduationCap,
-    desc: "Free quality education for rural children through learning centers, scholarships, and mentorship.",
-    highlights: ["500+ students enrolled", "15 learning centers", "100% first-generation learners"],
-  },
-  {
-    id: "medical",
-    title: "Medical Camps",
-    icon: Stethoscope,
-    desc: "Monthly free health checkup camps in underserved villages with medicines and referral support.",
-    highlights: ["Monthly camps", "Free medicines", "Specialist referrals"],
-  },
-  {
-    id: "food",
-    title: "Food Distribution",
-    icon: UtensilsCrossed,
-    desc: "Regular food distribution drives ensuring no family goes hungry in our served communities.",
-    highlights: ["15,000+ meals served", "Weekly drives", "Nutrition support"],
-  },
-  {
-    id: "women",
-    title: "Women Empowerment",
-    icon: Users,
-    desc: "Skill development, micro-finance, and leadership training for rural women.",
-    highlights: ["Skill workshops", "Micro-finance access", "Self-help groups"],
-  },
-];
+import { useI18n } from "@/lib/i18n";
 
 export default function ProgramsPage() {
+  const { t } = useI18n();
+
+  const programs = [
+    {
+      id: "education",
+      title: t("programs.education.title"),
+      icon: GraduationCap,
+      desc: t("programs.education.desc"),
+      highlights: [t("programs.education.h1"), t("programs.education.h2"), t("programs.education.h3")],
+    },
+    {
+      id: "medical",
+      title: t("programs.medical.title"),
+      icon: Stethoscope,
+      desc: t("programs.medical.desc"),
+      highlights: [t("programs.medical.h1"), t("programs.medical.h2"), t("programs.medical.h3")],
+    },
+    {
+      id: "food",
+      title: t("programs.food.title"),
+      icon: UtensilsCrossed,
+      desc: t("programs.food.desc"),
+      highlights: [t("programs.food.h1"), t("programs.food.h2"), t("programs.food.h3")],
+    },
+    {
+      id: "women",
+      title: t("programs.women.title"),
+      icon: Users,
+      desc: t("programs.women.desc"),
+      highlights: [t("programs.women.h1"), t("programs.women.h2"), t("programs.women.h3")],
+    },
+  ];
+
   return (
     <div>
       <section className="py-20 bg-muted/50">
         <div className="container mx-auto px-4 text-center">
-          <h1 className="text-4xl font-bold mb-4">Our Programs</h1>
-          <p className="text-muted-foreground max-w-xl mx-auto">Four focused initiatives creating lasting change across rural India</p>
+          <h1 className="text-4xl font-bold mb-4">{t("programs.title")}</h1>
+          <p className="text-muted-foreground max-w-xl mx-auto">{t("programs.subtitle")}</p>
         </div>
       </section>
 
       <section className="py-16">
         <div className="container mx-auto px-4 space-y-8">
-          {programs.map((program, i) => (
+          {programs.map((program, index) => (
             <motion.div
               key={program.id}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
+              transition={{ delay: index * 0.1 }}
               className="admin-card"
             >
               <div className="flex flex-col md:flex-row gap-6">
@@ -63,15 +66,15 @@ export default function ProgramsPage() {
                   <h2 className="text-xl font-bold">{program.title}</h2>
                   <p className="text-muted-foreground">{program.desc}</p>
                   <div className="flex flex-wrap gap-2">
-                    {program.highlights.map((h) => (
-                      <span key={h} className="px-3 py-1 rounded-full text-xs bg-primary/5 text-primary border border-primary/10">
-                        {h}
+                    {program.highlights.map((highlight) => (
+                      <span key={highlight} className="px-3 py-1 rounded-full text-xs bg-primary/5 text-primary border border-primary/10">
+                        {highlight}
                       </span>
                     ))}
                   </div>
                   <Link to="/volunteer">
                     <Button variant="outline" size="sm" className="gap-1 mt-2">
-                      Volunteer for this program <ArrowRight className="w-3 h-3" />
+                      {t("programs.volunteerCta")} <ArrowRight className="w-3 h-3" />
                     </Button>
                   </Link>
                 </div>

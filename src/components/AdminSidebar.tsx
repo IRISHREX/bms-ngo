@@ -7,23 +7,27 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { Language, useI18n } from "@/lib/i18n";
 
-const navItems = [
-  { title: "Dashboard", url: "/admin", icon: LayoutDashboard },
-  { title: "File Manager", url: "/admin/files", icon: FolderOpen },
-  { title: "Gallery", url: "/admin/gallery", icon: Image },
-  { title: "Notices", url: "/admin/notices", icon: Megaphone },
-  { title: "Blog", url: "/admin/blog", icon: FileText },
-  { title: "Projects", url: "/admin/projects", icon: Briefcase },
-  { title: "Volunteers", url: "/admin/volunteers", icon: Users },
-  { title: "Donations", url: "/admin/donations", icon: IndianRupee },
-  { title: "Users & Roles", url: "/admin/users", icon: Shield },
-];
+const languageOptions: Language[] = ["en", "bn", "hi", "ar"];
 
 export function AdminSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
   const user = getUser();
+  const { t, language, setLanguage } = useI18n();
+
+  const navItems = [
+    { title: t("admin.dashboard"), url: "/admin", icon: LayoutDashboard },
+    { title: t("admin.files"), url: "/admin/files", icon: FolderOpen },
+    { title: t("nav.gallery"), url: "/admin/gallery", icon: Image },
+    { title: t("nav.notices"), url: "/admin/notices", icon: Megaphone },
+    { title: t("nav.blog"), url: "/admin/blog", icon: FileText },
+    { title: t("admin.projects"), url: "/admin/projects", icon: Briefcase },
+    { title: t("admin.volunteers"), url: "/admin/volunteers", icon: Users },
+    { title: t("admin.donations"), url: "/admin/donations", icon: IndianRupee },
+    { title: t("admin.usersRoles"), url: "/admin/users", icon: Shield },
+  ];
 
   const handleLogout = () => {
     logout();
@@ -39,7 +43,7 @@ export function AdminSidebar() {
         {!collapsed && (
           <div className="overflow-hidden">
             <h1 className="text-sm font-bold text-sidebar-accent-foreground truncate">NGO Admin</h1>
-            <p className="text-xs text-sidebar-muted truncate">{user?.name ?? "Dashboard"}</p>
+            <p className="text-xs text-sidebar-muted truncate">{user?.name ?? t("admin.dashboard")}</p>
           </div>
         )}
       </div>
@@ -56,11 +60,27 @@ export function AdminSidebar() {
           </NavLink>
         ))}
       </nav>
+      {!collapsed && (
+        <div className="px-3 pb-3">
+          <label className="text-xs text-sidebar-muted block mb-1">{t("language.label")}</label>
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value as Language)}
+            className="h-9 w-full rounded-md border border-sidebar-border bg-sidebar px-2 text-sm text-sidebar-foreground"
+          >
+            {languageOptions.map((key) => (
+              <option key={key} value={key}>
+                {t(`lang.${key}`)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Logout */}
       <button onClick={handleLogout} className={cn("flex items-center gap-3 mx-2 mb-2 px-3 py-2.5 rounded-md text-sm text-sidebar-foreground hover:bg-destructive/10 hover:text-destructive transition-colors", collapsed && "justify-center px-2")}>
         <LogOut className="w-4 h-4 flex-shrink-0" />
-        {!collapsed && <span>Logout</span>}
+        {!collapsed && <span>{t("admin.logout")}</span>}
       </button>
 
       <button onClick={() => setCollapsed(!collapsed)} className="flex items-center justify-center h-12 border-t border-sidebar-border text-sidebar-muted hover:text-sidebar-accent-foreground transition-colors">

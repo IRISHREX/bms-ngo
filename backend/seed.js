@@ -126,8 +126,36 @@ async function seed() {
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   )`);
 
+  await db.query(`CREATE TABLE IF NOT EXISTS themes_catalog (
+    theme_key VARCHAR(50) PRIMARY KEY,
+    label VARCHAR(100) NOT NULL,
+    description VARCHAR(255) DEFAULT '',
+    sort_order INT DEFAULT 0
+  )`);
+
+  await db.query(`CREATE TABLE IF NOT EXISTS theme_settings (
+    id TINYINT PRIMARY KEY DEFAULT 1,
+    theme_key VARCHAR(50) NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  )`);
+
   // Seed impact stats
   await db.query("INSERT IGNORE INTO impact_stats (id, students_helped, meals_served, villages_reached) VALUES (1, 3200, 15000, 45)");
+
+  // Seed theme catalog + current theme
+  await db.query(
+    `INSERT IGNORE INTO themes_catalog (theme_key, label, description, sort_order) VALUES
+    ('hot', 'Hot', 'Warm red/orange profile', 1),
+    ('cool', 'Cool', 'Blue/cyan profile', 2),
+    ('rainy.green', 'Rainy Green', 'Soft rainy green profile', 3),
+    ('desart', 'Desart', 'Dry sand-inspired palette', 4),
+    ('forest', 'Forest', 'Natural green profile', 5),
+    ('glass', 'Glass', 'Light translucent style', 6),
+    ('snow', 'Snow', 'Crisp icy profile', 7),
+    ('dark', 'Dark', 'Dark neutral profile', 8),
+    ('blackpink', 'Blackpink', 'Black and pink contrast profile', 9)`
+  );
+  await db.query("INSERT IGNORE INTO theme_settings (id, theme_key) VALUES (1, 'forest')");
 
   // Seed users (upsert by email)
   const adminName = process.env.ADMIN_SEED_NAME || "Admin User";
