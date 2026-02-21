@@ -2,6 +2,9 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const morgan = require("morgan");
+const db = require("./config/db");
+const logger = require("./config/logger");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -16,6 +19,13 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json());
+app.use(
+  morgan("combined", {
+    stream: {
+      write: (message) => logger.http ? logger.http(message.trim()) : logger.info(message.trim()),
+    },
+  })
+);
 
 // Serve uploaded files
 const uploadDir = process.env.UPLOAD_DIR || path.join(__dirname, "uploads");
@@ -37,6 +47,46 @@ app.use("/api/theme", require("./routes/theme"));
 // Health check
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+app.use((err, req, res, next) => {
+  logger.error("Unhandled request error", {
+    method: req.method,
+    url: req.originalUrl,
+    message: err.message,
+    stack: err.stack,
+  });
+
+  if (res.headersSent) {
+    return next(err);
+  }
+
+  return res.status(500).json({ message: "Internal Server Error" });
 });
+
+process.on("unhandledRejection", (reason) => {
+  logger.error("Unhandled promise rejection", { reason });
+});
+
+process.on("uncaughtException", (error) => {
+  logger.error("Uncaught exception", { message: error.message, stack: error.stack });
+  process.exit(1);
+});
+
+async function startServer() {
+  try {
+    await db.query("SELECT 1");
+
+    const dbHost = process.env.DB_HOST || "localhost";
+    const dbUser = process.env.DB_USER || "root";
+    const dbSchema = process.env.DB_NAME || "ngo_db";
+    logger.info("DB connected", { host: dbHost, user: dbUser, schema: dbSchema });
+
+    app.listen(PORT, () => {
+      logger.info("Server started", { port: PORT, env: process.env.NODE_ENV || "development" });
+    });
+  } catch (error) {
+    logger.error("Failed to connect to DB", { message: error.message, stack: error.stack });
+    process.exit(1);
+  }
+}
+
+startServer();
