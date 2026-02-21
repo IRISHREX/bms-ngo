@@ -2,9 +2,9 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
-const morgan = require("morgan");
 const db = require("./config/db");
 const logger = require("./config/logger");
+const { ensureDatabaseAndTables } = require("./config/dbBootstrap");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -19,13 +19,38 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json());
-app.use(
-  morgan("combined", {
-    stream: {
-      write: (message) => logger.http ? logger.http(message.trim()) : logger.info(message.trim()),
-    },
-  })
-);
+app.use((req, res, next) => {
+  const start = Date.now();
+
+  res.on("finish", () => {
+    if (!req.originalUrl.startsWith("/api")) {
+      return;
+    }
+
+    const durationMs = Date.now() - start;
+    const payload = {
+      method: req.method,
+      path: req.originalUrl,
+      status: res.statusCode,
+      durationMs,
+      userId: req.user?.id || null,
+    };
+
+    if (res.statusCode >= 500) {
+      logger.error("API request failed", payload);
+      return;
+    }
+
+    if (res.statusCode >= 400) {
+      logger.warn("API request warning", payload);
+      return;
+    }
+
+    logger.info("API request completed", payload);
+  });
+
+  next();
+});
 
 // Serve uploaded files
 const uploadDir = process.env.UPLOAD_DIR || path.join(__dirname, "uploads");
@@ -73,6 +98,7 @@ process.on("uncaughtException", (error) => {
 
 async function startServer() {
   try {
+    await ensureDatabaseAndTables();
     await db.query("SELECT 1");
 
     const dbHost = process.env.DB_HOST || "localhost";
