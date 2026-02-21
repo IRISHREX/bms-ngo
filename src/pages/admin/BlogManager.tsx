@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createBlogPost, deleteBlogPost, fetchAdminBlogPosts, formatDate, updateBlogPost, type BlogPost } from "@/lib/api";
+import { createBlogPost, deleteBlogPost, fetchAdminBlogPosts, formatDate, updateBlogPost, uploadFile, type BlogPost } from "@/lib/api";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +22,7 @@ export default function BlogManager() {
   const [editing, setEditing] = useState<Partial<BlogPost>>(emptyPost);
   const [deleteTarget, setDeleteTarget] = useState<BlogPost | null>(null);
   const [tagInput, setTagInput] = useState("");
+  const [coverFile, setCoverFile] = useState<File | null>(null);
 
   const invalidateBlog = async () => {
     await queryClient.invalidateQueries({ queryKey: ["admin-blog-posts"] });
@@ -61,12 +62,14 @@ export default function BlogManager() {
   const openCreate = () => {
     setEditing({ ...emptyPost });
     setTagInput("");
+    setCoverFile(null);
     setDialogOpen(true);
   };
 
   const openEdit = (p: BlogPost) => {
     setEditing({ ...p });
     setTagInput((p.tags || []).join(", "));
+    setCoverFile(null);
     setDialogOpen(true);
   };
 
@@ -75,7 +78,7 @@ export default function BlogManager() {
     setDeleteOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!editing.title?.trim() || !editing.content?.trim()) {
       toast({ title: "Missing fields", description: "Title and content are required.", variant: "destructive" });
       return;
@@ -88,6 +91,17 @@ export default function BlogManager() {
       status: editing.status || "draft",
       tags,
     };
+
+    if (coverFile) {
+      try {
+        const uploaded = await uploadFile(coverFile, "blog", "Blog");
+        payload.coverImage = uploaded.id;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Cover upload failed";
+        toast({ title: "Cover upload failed", description: message, variant: "destructive" });
+        return;
+      }
+    }
 
     if (editing.id) {
       updateMutation.mutate({ id: editing.id, data: payload });
@@ -159,6 +173,13 @@ export default function BlogManager() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="draft">Draft</SelectItem><SelectItem value="published">Published</SelectItem></SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Cover Image</Label>
+              {editing.coverImage && (
+                <img src={editing.coverImage} alt="Current cover" className="w-full h-32 object-cover rounded-md border border-border" />
+              )}
+              <Input type="file" accept="image/*" onChange={(e) => setCoverFile(e.target.files?.[0] || null)} />
             </div>
             <div className="space-y-2"><Label>Tags (comma-separated)</Label><Input value={tagInput} onChange={(e) => setTagInput(e.target.value)} placeholder="education, impact, report" /></div>
           </div>

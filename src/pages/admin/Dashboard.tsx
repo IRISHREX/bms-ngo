@@ -1,5 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
-import { fetchDashboardStats, fetchRecentActivity, formatCurrency } from "@/lib/api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchDashboardStats, fetchRecentActivity, fetchThemeState, formatCurrency, updateTheme } from "@/lib/api";
+import { applyTheme, isThemeKey } from "@/lib/theme";
 import {
   IndianRupee,
   Users,
@@ -12,6 +13,9 @@ import {
   MapPin,
   TrendingUp,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/hooks/use-toast";
+import { useI18n } from "@/lib/i18n";
 
 interface StatCardProps {
   title: string;
@@ -44,23 +48,28 @@ function StatCard({ title, value, icon: Icon, description, trend }: StatCardProp
   );
 }
 
-function formatRelativeTime(dateStr: string) {
+function formatRelativeTime(
+  dateStr: string,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+) {
   const now = Date.now();
   const then = new Date(dateStr).getTime();
   const diffMs = now - then;
   const diffMin = Math.floor(diffMs / 60000);
 
-  if (diffMin < 1) return "just now";
-  if (diffMin < 60) return `${diffMin} min ago`;
+  if (diffMin < 1) return t("time.justNow");
+  if (diffMin < 60) return t("time.minAgo", { count: diffMin });
 
   const diffHours = Math.floor(diffMin / 60);
-  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+  if (diffHours < 24) return t("time.hourAgo", { count: diffHours });
 
   const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
+  return t("time.dayAgo", { count: diffDays });
 }
 
 export default function Dashboard() {
+  const { t } = useI18n();
+  const queryClient = useQueryClient();
   const { data: stats, isLoading } = useQuery({
     queryKey: ["dashboard-stats"],
     queryFn: fetchDashboardStats,
@@ -71,12 +80,32 @@ export default function Dashboard() {
     queryFn: fetchRecentActivity,
   });
 
+  const { data: themeState } = useQuery({
+    queryKey: ["theme-state"],
+    queryFn: fetchThemeState,
+  });
+
+  const themeMutation = useMutation({
+    mutationFn: updateTheme,
+    onSuccess: async (_data, themeKey) => {
+      if (isThemeKey(themeKey)) {
+        applyTheme(themeKey);
+        localStorage.setItem("ngo_theme_key", themeKey);
+      }
+      await queryClient.invalidateQueries({ queryKey: ["theme-state"] });
+      toast({ title: "Theme updated", description: `Applied ${themeKey}` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Theme update failed", description: error.message, variant: "destructive" });
+    },
+  });
+
   if (isLoading) {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="page-header">Dashboard</h1>
-          <p className="page-description">Overview of your NGO operations</p>
+          <h1 className="page-header">{t("dashboard.title")}</h1>
+          <p className="page-description">{t("dashboard.subtitle")}</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
@@ -92,34 +121,57 @@ export default function Dashboard() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="page-header">Dashboard</h1>
-        <p className="page-description">Overview of your NGO operations</p>
+        <h1 className="page-header">{t("dashboard.title")}</h1>
+        <p className="page-description">{t("dashboard.subtitle")}</p>
       </div>
 
       <div>
-        <h2 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wider">Platform</h2>
+        <h2 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wider">{t("dashboard.platform")}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-          <StatCard title="Total Donations" value={stats?.totalDonations.toLocaleString() ?? "0"} icon={IndianRupee} trend="+12% this month" />
-          <StatCard title="Volunteers" value={stats?.totalVolunteers ?? 0} icon={Users} trend="+5 this week" />
-          <StatCard title="Photos" value={stats?.totalPhotos ?? 0} icon={Image} />
-          <StatCard title="Notices" value={stats?.totalNotices ?? 0} icon={Megaphone} />
-          <StatCard title="Blog Posts" value={stats?.totalBlogPosts ?? 0} icon={FileText} />
-          <StatCard title="Projects" value={stats?.totalProjects ?? 0} icon={Briefcase} />
+          <StatCard title={t("dashboard.stat.totalDonations")} value={stats?.totalDonations.toLocaleString() ?? "0"} icon={IndianRupee} trend={t("dashboard.trend.donationsMonth")} />
+          <StatCard title={t("dashboard.stat.volunteers")} value={stats?.totalVolunteers ?? 0} icon={Users} trend={t("dashboard.trend.volunteersWeek")} />
+          <StatCard title={t("dashboard.stat.photos")} value={stats?.totalPhotos ?? 0} icon={Image} />
+          <StatCard title={t("dashboard.stat.notices")} value={stats?.totalNotices ?? 0} icon={Megaphone} />
+          <StatCard title={t("dashboard.stat.blogPosts")} value={stats?.totalBlogPosts ?? 0} icon={FileText} />
+          <StatCard title={t("dashboard.stat.projects")} value={stats?.totalProjects ?? 0} icon={Briefcase} />
         </div>
       </div>
 
       <div>
-        <h2 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wider">Impact</h2>
+        <h2 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wider">{t("dashboard.impact")}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard title="Donation Amount" value={formatCurrency(stats?.donationAmount ?? 0)} icon={IndianRupee} description="Total funds raised" trend="+18% this quarter" />
-          <StatCard title="Students Helped" value={(stats?.studentsHelped ?? 0).toLocaleString()} icon={GraduationCap} description="Through education programs" />
-          <StatCard title="Meals Served" value={(stats?.mealsServed ?? 0).toLocaleString()} icon={UtensilsCrossed} description="Food distribution drives" />
-          <StatCard title="Villages Reached" value={stats?.villagesReached ?? 0} icon={MapPin} description="Across 3 states" />
+          <StatCard title={t("dashboard.stat.donationAmount")} value={formatCurrency(stats?.donationAmount ?? 0)} icon={IndianRupee} description={t("dashboard.desc.totalFunds")} trend={t("dashboard.trend.quarter")} />
+          <StatCard title={t("home.stats.students")} value={(stats?.studentsHelped ?? 0).toLocaleString()} icon={GraduationCap} description={t("dashboard.desc.education")} />
+          <StatCard title={t("home.stats.meals")} value={(stats?.mealsServed ?? 0).toLocaleString()} icon={UtensilsCrossed} description={t("dashboard.desc.food")} />
+          <StatCard title={t("home.stats.villages")} value={stats?.villagesReached ?? 0} icon={MapPin} description={t("dashboard.desc.states")} />
         </div>
       </div>
 
       <div className="admin-card">
-        <h2 className="text-lg font-semibold mb-4">Recent Activity</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">{t("dashboard.themeStudio")}</h2>
+          <p className="text-xs text-muted-foreground">{t("dashboard.themeDesc")}</p>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+          {(themeState?.themes || []).map((theme) => {
+            const active = themeState?.currentThemeKey === theme.themeKey;
+            return (
+              <Button
+                key={theme.themeKey}
+                variant={active ? "default" : "outline"}
+                className="justify-start"
+                onClick={() => themeMutation.mutate(theme.themeKey)}
+                disabled={themeMutation.isPending}
+              >
+                {theme.label}
+              </Button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="admin-card">
+        <h2 className="text-lg font-semibold mb-4">{t("dashboard.recentActivity")}</h2>
         <div className="space-y-3">
           {isActivityLoading && Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="py-2 border-b border-border last:border-0">
@@ -131,12 +183,12 @@ export default function Dashboard() {
           {!isActivityLoading && recentActivity.map((item, i) => (
             <div key={`${item.type}-${i}`} className="flex items-center justify-between py-2 border-b border-border last:border-0">
               <p className="text-sm text-foreground">{item.text}</p>
-              <span className="text-xs text-muted-foreground whitespace-nowrap ml-4">{formatRelativeTime(item.createdAt)}</span>
+              <span className="text-xs text-muted-foreground whitespace-nowrap ml-4">{formatRelativeTime(item.createdAt, t)}</span>
             </div>
           ))}
 
           {!isActivityLoading && recentActivity.length === 0 && (
-            <p className="text-sm text-muted-foreground py-2">No recent activity yet.</p>
+            <p className="text-sm text-muted-foreground py-2">{t("dashboard.noActivity")}</p>
           )}
         </div>
       </div>
