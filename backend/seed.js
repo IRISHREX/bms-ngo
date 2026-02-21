@@ -146,14 +146,15 @@ async function seed() {
   await db.query(
     `INSERT IGNORE INTO themes_catalog (theme_key, label, description, sort_order) VALUES
     ('hot', 'Hot', 'Warm red/orange profile', 1),
-    ('cool', 'Cool', 'Blue/cyan profile', 2),
-    ('rainy.green', 'Rainy Green', 'Soft rainy green profile', 3),
-    ('desart', 'Desart', 'Dry sand-inspired palette', 4),
-    ('forest', 'Forest', 'Natural green profile', 5),
-    ('glass', 'Glass', 'Light translucent style', 6),
-    ('snow', 'Snow', 'Crisp icy profile', 7),
-    ('dark', 'Dark', 'Dark neutral profile', 8),
-    ('blackpink', 'Blackpink', 'Black and pink contrast profile', 9)`
+    ('cyberpunk', 'Cyber Punk', 'Neon cyan/magenta profile', 2),
+    ('retro', 'Retro', 'Vintage warm palette', 3),
+    ('golden-dark', 'Golden Dark', 'Dark theme with rich gold accents', 4),
+    ('golden-silver', 'Golden Silver', 'Light silver base with golden highlights', 5),
+    ('desart', 'Desart', 'Dry sand-inspired palette', 6),
+    ('forest', 'Forest', 'Natural green profile', 7),
+    ('snow', 'Snow', 'Crisp icy profile', 8),
+    ('dark', 'Dark', 'Dark neutral profile', 9),
+    ('blackpink', 'Blackpink', 'Black and pink contrast profile', 10)`
   );
   await db.query("INSERT IGNORE INTO theme_settings (id, theme_key) VALUES (1, 'forest')");
 

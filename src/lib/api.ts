@@ -19,6 +19,7 @@ export interface DashboardStats {
 }
 
 export interface RecentActivityItem {
+  key: string;
   type: "donation" | "volunteer" | "blog" | "gallery" | "notice" | "project";
   text: string;
   createdAt: string;
@@ -196,6 +197,14 @@ export async function updateImpactStats(data: { studentsHelped: number; mealsSer
 
 export async function fetchRecentActivity(): Promise<RecentActivityItem[]> {
   return get<RecentActivityItem[]>("/stats/activity", true);
+}
+
+export async function deleteRecentActivityItem(key: string) {
+  return post("/stats/activity/delete", { key });
+}
+
+export async function clearRecentActivity() {
+  return post("/stats/activity/clear-all", {});
 }
 
 export async function fetchTransparencyData(): Promise<TransparencyData> {
