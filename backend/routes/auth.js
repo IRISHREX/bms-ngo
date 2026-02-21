@@ -5,20 +5,32 @@ const db = require("../config/db");
 const logger = require("../config/logger");
 const { verifyToken } = require("../middleware/auth");
 
+function getClientInfo(req) {
+  return {
+    ip: req.headers["x-forwarded-for"] || req.socket.remoteAddress || null,
+    userAgent: req.get("user-agent") || null,
+    secChUa: req.get("sec-ch-ua") || null,
+    secChUaPlatform: req.get("sec-ch-ua-platform") || null,
+    secChUaMobile: req.get("sec-ch-ua-mobile") || null,
+    referer: req.get("referer") || null,
+  };
+}
+
 // POST /api/auth/login
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
+    const clientInfo = getClientInfo(req);
     const [rows] = await db.query("SELECT * FROM users WHERE email = ? AND status = 'active'", [email]);
     if (rows.length === 0) {
-      logger.warn("Login failed: user not found or inactive", { email });
+      logger.warn("Login failed: user not found or inactive", { email, ...clientInfo });
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
     const user = rows[0];
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
-      logger.warn("Login failed: invalid password", { email });
+      logger.warn("Login failed: invalid password", { email, ...clientInfo });
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
@@ -28,13 +40,18 @@ router.post("/login", async (req, res) => {
       { expiresIn: "24h" }
     );
 
-    logger.info("Login success", { userId: user.id, email: user.email, role: user.role });
+    logger.info("Login success", {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      ...clientInfo,
+    });
     res.json({
       token,
       user: { id: String(user.id), name: user.name, email: user.email, role: user.role },
     });
   } catch (err) {
-    logger.error("Login error", { message: err.message, stack: err.stack });
+    logger.error("Login error", { message: err.message, stack: err.stack, ...getClientInfo(req) });
     res.status(500).json({ error: err.message });
   }
 });
