@@ -1,5 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchDashboardStats, fetchRecentActivity, fetchThemeState, formatCurrency, updateTheme } from "@/lib/api";
+import {
+  clearRecentActivity,
+  deleteRecentActivityItem,
+  fetchDashboardStats,
+  fetchRecentActivity,
+  fetchThemeState,
+  formatCurrency,
+  updateTheme,
+} from "@/lib/api";
 import { applyTheme, isThemeKey } from "@/lib/theme";
 import {
   IndianRupee,
@@ -12,6 +20,7 @@ import {
   UtensilsCrossed,
   MapPin,
   TrendingUp,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
@@ -100,6 +109,28 @@ export default function Dashboard() {
     },
   });
 
+  const clearActivityMutation = useMutation({
+    mutationFn: clearRecentActivity,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["recent-activity"] });
+      toast({ title: "Recent activity cleared" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Clear failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteActivityMutation = useMutation({
+    mutationFn: (key: string) => deleteRecentActivityItem(key),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["recent-activity"] });
+      toast({ title: "Activity removed" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+    },
+  });
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -171,7 +202,17 @@ export default function Dashboard() {
       </div>
 
       <div className="admin-card">
-        <h2 className="text-lg font-semibold mb-4">{t("dashboard.recentActivity")}</h2>
+        <div className="flex items-center justify-between mb-4 gap-3">
+          <h2 className="text-lg font-semibold">{t("dashboard.recentActivity")}</h2>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => clearActivityMutation.mutate()}
+            disabled={clearActivityMutation.isPending || isActivityLoading || recentActivity.length === 0}
+          >
+            Clear All
+          </Button>
+        </div>
         <div className="space-y-3">
           {isActivityLoading && Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="py-2 border-b border-border last:border-0">
@@ -180,10 +221,23 @@ export default function Dashboard() {
             </div>
           ))}
 
-          {!isActivityLoading && recentActivity.map((item, i) => (
-            <div key={`${item.type}-${i}`} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+          {!isActivityLoading && recentActivity.map((item) => (
+            <div key={item.key} className="flex items-center justify-between py-2 border-b border-border last:border-0 gap-3">
               <p className="text-sm text-foreground">{item.text}</p>
-              <span className="text-xs text-muted-foreground whitespace-nowrap ml-4">{formatRelativeTime(item.createdAt, t)}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground whitespace-nowrap">{formatRelativeTime(item.createdAt, t)}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => deleteActivityMutation.mutate(item.key)}
+                  disabled={deleteActivityMutation.isPending}
+                  aria-label="Delete activity"
+                  title="Delete activity"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           ))}
 

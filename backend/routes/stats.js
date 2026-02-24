@@ -2,6 +2,49 @@ const router = require("express").Router();
 const db = require("../config/db");
 const { verifyToken } = require("../middleware/auth");
 const path = require("path");
+const logger = require("../config/logger");
+
+function activityKeyFor(item) {
+  return `${item.type}|${item.text}|${new Date(item.createdAt).toISOString()}`;
+}
+
+function buildActivityItems(donations, volunteers, blogs, gallery, notices, projects) {
+  return [
+    ...donations.map((d) => ({
+      type: "donation",
+      text: `New donation of INR ${Number(d.amount).toLocaleString("en-IN")} from ${d.donor_name || "Anonymous"}`,
+      createdAt: d.created_at,
+    })),
+    ...volunteers.map((v) => ({
+      type: "volunteer",
+      text: `New ${v.type || "volunteer"} application from ${v.name}`,
+      createdAt: v.created_at,
+    })),
+    ...blogs.map((b) => ({
+      type: "blog",
+      text: `Blog post "${b.title}" is ${b.status}`,
+      createdAt: b.created_at,
+    })),
+    ...gallery.map((g) => ({
+      type: "gallery",
+      text: `Gallery photo added${g.caption ? `: ${g.caption}` : ""}`,
+      createdAt: g.created_at,
+    })),
+    ...notices.map((n) => ({
+      type: "notice",
+      text: `Notice "${n.title}" is ${n.status}`,
+      createdAt: n.created_at,
+    })),
+    ...projects.map((p) => ({
+      type: "project",
+      text: `Project "${p.title}" is ${p.status}`,
+      createdAt: p.created_at,
+    })),
+  ]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 12)
+    .map((item) => ({ ...item, key: activityKeyFor(item) }));
+}
 
 // GET /api/stats
 router.get("/", async (req, res) => {
@@ -116,44 +159,73 @@ router.get("/activity", verifyToken, async (req, res) => {
       db.query("SELECT title, status, created_at FROM projects ORDER BY created_at DESC LIMIT 6"),
     ]);
 
-    const items = [
-      ...donations.map((d) => ({
-        type: "donation",
-        text: `New donation of INR ${Number(d.amount).toLocaleString("en-IN")} from ${d.donor_name || "Anonymous"}`,
-        createdAt: d.created_at,
-      })),
-      ...volunteers.map((v) => ({
-        type: "volunteer",
-        text: `New ${v.type || "volunteer"} application from ${v.name}`,
-        createdAt: v.created_at,
-      })),
-      ...blogs.map((b) => ({
-        type: "blog",
-        text: `Blog post "${b.title}" is ${b.status}`,
-        createdAt: b.created_at,
-      })),
-      ...gallery.map((g) => ({
-        type: "gallery",
-        text: `Gallery photo added${g.caption ? `: ${g.caption}` : ""}`,
-        createdAt: g.created_at,
-      })),
-      ...notices.map((n) => ({
-        type: "notice",
-        text: `Notice "${n.title}" is ${n.status}`,
-        createdAt: n.created_at,
-      })),
-      ...projects.map((p) => ({
-        type: "project",
-        text: `Project "${p.title}" is ${p.status}`,
-        createdAt: p.created_at,
-      })),
-    ]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 12);
+    const items = buildActivityItems(donations, volunteers, blogs, gallery, notices, projects);
+    const [dismissedRows] = await db.query("SELECT activity_key FROM activity_dismissals WHERE user_id = ?", [req.user.id]);
+    const dismissed = new Set(dismissedRows.map((row) => row.activity_key));
+    const visibleItems = items.filter((item) => !dismissed.has(item.key));
 
-    res.json(items);
+    res.json(visibleItems);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/stats/activity/delete
+router.post("/activity/delete", verifyToken, async (req, res) => {
+  try {
+    const { key } = req.body || {};
+    if (!key || typeof key !== "string") {
+      return res.status(400).json({ error: "Activity key is required" });
+    }
+
+    await db.query(
+      "INSERT IGNORE INTO activity_dismissals (user_id, activity_key) VALUES (?, ?)",
+      [req.user.id, key]
+    );
+    logger.info("Recent activity item dismissed", { userId: req.user.id, key });
+    return res.json({ message: "Activity deleted" });
+  } catch (err) {
+    logger.error("Recent activity delete failed", { message: err.message, stack: err.stack, userId: req.user?.id || null });
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/stats/activity/clear-all
+router.post("/activity/clear-all", verifyToken, async (req, res) => {
+  try {
+    const [
+      [donations],
+      [volunteers],
+      [blogs],
+      [gallery],
+      [notices],
+      [projects],
+    ] = await Promise.all([
+      db.query("SELECT donor_name, amount, created_at FROM donations ORDER BY created_at DESC LIMIT 6"),
+      db.query("SELECT name, type, created_at FROM volunteers ORDER BY created_at DESC LIMIT 6"),
+      db.query("SELECT title, status, created_at FROM blog_posts ORDER BY created_at DESC LIMIT 6"),
+      db.query("SELECT caption, category, created_at FROM gallery ORDER BY created_at DESC LIMIT 6"),
+      db.query("SELECT title, status, created_at FROM notices ORDER BY created_at DESC LIMIT 6"),
+      db.query("SELECT title, status, created_at FROM projects ORDER BY created_at DESC LIMIT 6"),
+    ]);
+
+    const items = buildActivityItems(donations, volunteers, blogs, gallery, notices, projects);
+    if (items.length === 0) {
+      return res.json({ message: "No activity to clear" });
+    }
+
+    const placeholders = items.map(() => "(?, ?)").join(", ");
+    const params = items.flatMap((item) => [req.user.id, item.key]);
+    await db.query(
+      `INSERT IGNORE INTO activity_dismissals (user_id, activity_key) VALUES ${placeholders}`,
+      params
+    );
+
+    logger.info("Recent activity cleared", { userId: req.user.id, count: items.length });
+    return res.json({ message: "Recent activity cleared" });
+  } catch (err) {
+    logger.error("Recent activity clear-all failed", { message: err.message, stack: err.stack, userId: req.user?.id || null });
+    return res.status(500).json({ error: err.message });
   }
 });
 

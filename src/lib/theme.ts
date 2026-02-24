@@ -1,10 +1,11 @@
 export type ThemeKey =
   | "hot"
-  | "cool"
-  | "rainy.green"
+  | "cyberpunk"
+  | "retro"
+  | "golden-dark"
+  | "golden-silver"
   | "desart"
   | "forest"
-  | "glass"
   | "snow"
   | "dark"
   | "blackpink";
@@ -57,20 +58,73 @@ const PRESETS: Record<ThemeKey, Partial<ThemeVars>> = {
     "--chart-rose": "8 92% 58%",
     "--chart-amber": "32 95% 53%",
   },
-  cool: {
-    "--primary": "206 89% 52%",
-    "--accent": "193 95% 43%",
-    "--ring": "206 89% 52%",
-    "--chart-blue": "206 89% 52%",
-    "--chart-violet": "225 84% 58%",
+  cyberpunk: {
+    "--background": "242 35% 8%",
+    "--foreground": "185 85% 92%",
+    "--card": "242 30% 12%",
+    "--card-foreground": "185 85% 92%",
+    "--primary": "189 100% 50%",
+    "--primary-foreground": "0 0% 100%",
+    "--accent": "316 100% 58%",
+    "--accent-foreground": "0 0% 100%",
+    "--border": "252 40% 22%",
+    "--input": "252 40% 22%",
+    "--ring": "189 100% 50%",
+    "--chart-blue": "189 100% 50%",
+    "--chart-violet": "316 100% 58%",
+    "--chart-amber": "48 100% 55%",
   },
-  "rainy.green": {
-    "--background": "150 20% 96%",
-    "--card": "150 18% 98%",
-    "--primary": "152 33% 39%",
-    "--accent": "145 28% 45%",
-    "--ring": "152 33% 39%",
-    "--muted": "150 16% 92%",
+  retro: {
+    "--background": "45 46% 94%",
+    "--foreground": "18 25% 20%",
+    "--card": "42 55% 97%",
+    "--card-foreground": "18 25% 20%",
+    "--primary": "15 65% 45%",
+    "--primary-foreground": "0 0% 100%",
+    "--accent": "185 54% 39%",
+    "--accent-foreground": "0 0% 100%",
+    "--muted": "40 36% 88%",
+    "--border": "30 30% 80%",
+    "--input": "30 30% 80%",
+    "--ring": "15 65% 45%",
+    "--chart-amber": "28 75% 48%",
+    "--chart-blue": "185 54% 39%",
+  },
+  "golden-dark": {
+    "--background": "30 22% 8%",
+    "--foreground": "43 70% 90%",
+    "--card": "28 20% 12%",
+    "--card-foreground": "43 70% 90%",
+    "--primary": "45 88% 52%",
+    "--primary-foreground": "30 30% 10%",
+    "--accent": "37 78% 58%",
+    "--accent-foreground": "30 30% 10%",
+    "--secondary": "30 16% 18%",
+    "--secondary-foreground": "43 70% 90%",
+    "--muted": "30 16% 18%",
+    "--muted-foreground": "42 30% 70%",
+    "--border": "34 25% 24%",
+    "--input": "34 25% 24%",
+    "--ring": "45 88% 52%",
+    "--chart-amber": "45 88% 52%",
+    "--chart-rose": "15 75% 58%",
+  },
+  "golden-silver": {
+    "--background": "210 14% 96%",
+    "--foreground": "224 10% 18%",
+    "--card": "210 16% 99%",
+    "--card-foreground": "224 10% 18%",
+    "--primary": "44 92% 48%",
+    "--primary-foreground": "224 10% 18%",
+    "--accent": "220 9% 62%",
+    "--accent-foreground": "0 0% 100%",
+    "--secondary": "210 14% 90%",
+    "--muted": "210 14% 92%",
+    "--border": "215 12% 82%",
+    "--input": "215 12% 82%",
+    "--ring": "44 92% 48%",
+    "--chart-amber": "44 92% 48%",
+    "--chart-blue": "220 9% 62%",
   },
   desart: {
     "--background": "36 42% 95%",
@@ -87,14 +141,6 @@ const PRESETS: Record<ThemeKey, Partial<ThemeVars>> = {
     "--accent": "150 47% 39%",
     "--ring": "142 57% 33%",
     "--chart-emerald": "142 57% 33%",
-  },
-  glass: {
-    "--background": "210 28% 97%",
-    "--card": "210 40% 99%",
-    "--primary": "206 82% 46%",
-    "--accent": "190 72% 48%",
-    "--ring": "206 82% 46%",
-    "--border": "210 32% 86%",
   },
   snow: {
     "--background": "210 35% 99%",

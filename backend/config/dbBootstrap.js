@@ -5,6 +5,19 @@ const DB_HOST = process.env.DB_HOST || "localhost";
 const DB_USER = process.env.DB_USER || "root";
 const DB_PASSWORD = process.env.DB_PASSWORD || "";
 const DB_NAME = process.env.DB_NAME || "ngo_db";
+const REMOVED_THEME_KEYS = ["cool", "glass", "rainy.green"];
+const SUPPORTED_THEMES = [
+  { key: "hot", label: "Hot", description: "Warm red/orange profile", sortOrder: 1 },
+  { key: "cyberpunk", label: "Cyber Punk", description: "Neon cyan/magenta profile", sortOrder: 2 },
+  { key: "retro", label: "Retro", description: "Vintage warm palette", sortOrder: 3 },
+  { key: "golden-dark", label: "Golden Dark", description: "Dark theme with rich gold accents", sortOrder: 4 },
+  { key: "golden-silver", label: "Golden Silver", description: "Light silver base with golden highlights", sortOrder: 5 },
+  { key: "desart", label: "Desart", description: "Dry sand-inspired palette", sortOrder: 6 },
+  { key: "forest", label: "Forest", description: "Natural green profile", sortOrder: 7 },
+  { key: "snow", label: "Snow", description: "Crisp icy profile", sortOrder: 8 },
+  { key: "dark", label: "Dark", description: "Dark neutral profile", sortOrder: 9 },
+  { key: "blackpink", label: "Blackpink", description: "Black and pink contrast profile", sortOrder: 10 },
+];
 
 const TABLE_QUERIES = [
   `CREATE TABLE IF NOT EXISTS users (
@@ -107,6 +120,13 @@ const TABLE_QUERIES = [
     theme_key VARCHAR(50) NOT NULL,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   ) ENGINE=InnoDB`,
+  `CREATE TABLE IF NOT EXISTS activity_dismissals (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    activity_key VARCHAR(191) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_user_activity (user_id, activity_key)
+  ) ENGINE=InnoDB`,
 ];
 
 async function ensureDatabaseAndTables() {
@@ -137,6 +157,37 @@ async function ensureDatabaseAndTables() {
     for (const query of TABLE_QUERIES) {
       await dbConn.query(query);
     }
+
+    for (const theme of SUPPORTED_THEMES) {
+      await dbConn.query(
+        `INSERT INTO themes_catalog (theme_key, label, description, sort_order)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           label = VALUES(label),
+           description = VALUES(description),
+           sort_order = VALUES(sort_order)`,
+        [theme.key, theme.label, theme.description, theme.sortOrder]
+      );
+    }
+
+    if (REMOVED_THEME_KEYS.length > 0) {
+      await dbConn.query(
+        `DELETE FROM themes_catalog WHERE theme_key IN (${REMOVED_THEME_KEYS.map(() => "?").join(",")})`,
+        REMOVED_THEME_KEYS
+      );
+    }
+
+    const [settingRows] = await dbConn.query("SELECT theme_key FROM theme_settings WHERE id = 1 LIMIT 1");
+    const currentTheme = settingRows[0]?.theme_key;
+    const hasCurrentTheme = SUPPORTED_THEMES.some((theme) => theme.key === currentTheme);
+    if (!hasCurrentTheme) {
+      await dbConn.query(
+        `INSERT INTO theme_settings (id, theme_key)
+         VALUES (1, 'forest')
+         ON DUPLICATE KEY UPDATE theme_key = VALUES(theme_key)`
+      );
+    }
+
     logger.info("Database tables ensured", { schema: DB_NAME, tableCount: TABLE_QUERIES.length });
   } finally {
     await dbConn.end();
