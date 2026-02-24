@@ -52,7 +52,7 @@ export default function HomePage() {
                 </Button>
               </Link>
               <Link to="/volunteer">
-                <Button size="lg" variant="outline" className="gap-2 text-base px-8 border-background/30 text-background hover:bg-background/10">
+                <Button size="lg" variant="outline" className="gap-2 text-base px-8 border-background/30  hover:bg-background/10">
                   {t("home.hero.volunteer")}
                 </Button>
               </Link>
@@ -208,7 +208,7 @@ export default function HomePage() {
             <p className="text-lg opacity-90">{t("home.cta.desc")}</p>
             <div className="flex flex-wrap justify-center gap-4">
               <Link to="/donate"><Button size="lg" variant="secondary" className="text-base px-8">{t("cta.donateNow")}</Button></Link>
-              <Link to="/volunteer"><Button size="lg" variant="outline" className="text-base px-8 border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10">{t("cta.volunteer")}</Button></Link>
+              <Link to="/volunteer"><Button size="lg" variant="outline" className="text-base px-8 bg-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10">{t("cta.volunteer")}</Button></Link>
             </div>
           </motion.div>
         </div>
