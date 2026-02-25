@@ -18,7 +18,11 @@ app.use(cors({
   origin: allowedOrigins,
   credentials: true,
 }));
-app.use(express.json());
+app.use((req, res, next) => {
+  // Skip JSON parsing for Razorpay webhook — it needs raw body for HMAC verification
+  if (req.originalUrl === "/api/razorpay/webhook") return next();
+  express.json()(req, res, next);
+});
 app.use((req, res, next) => {
   const start = Date.now();
 
