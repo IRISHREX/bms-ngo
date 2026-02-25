@@ -68,6 +68,7 @@ app.use("/api/volunteers", require("./routes/volunteers"));
 app.use("/api/donations", require("./routes/donations"));
 app.use("/api/users", require("./routes/users"));
 app.use("/api/theme", require("./routes/theme"));
+app.use("/api/razorpay", require("./routes/razorpay"));
 
 // Health check
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
