@@ -98,9 +98,23 @@ const TABLE_QUERIES = [
     amount DECIMAL(12,2) NOT NULL,
     payment_id VARCHAR(100),
     receipt_generated BOOLEAN DEFAULT FALSE,
+    webhook_verified BOOLEAN DEFAULT FALSE,
     type ENUM('one-time', 'monthly', 'campaign') DEFAULT 'one-time',
     campaign VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB`,
+  `CREATE TABLE IF NOT EXISTS payment_events (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    event_type VARCHAR(50) NOT NULL,
+    payment_id VARCHAR(100),
+    order_id VARCHAR(100),
+    amount DECIMAL(12,2) DEFAULT 0,
+    error_code VARCHAR(100),
+    error_description TEXT,
+    raw_payload LONGTEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_payment_id (payment_id),
+    INDEX idx_event_type (event_type)
   ) ENGINE=InnoDB`,
   `CREATE TABLE IF NOT EXISTS impact_stats (
     id INT PRIMARY KEY DEFAULT 1,
