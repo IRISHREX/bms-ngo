@@ -88,9 +88,8 @@ export default function TransparencyPage() {
                         cx={CHART_DIM.cx}
                         cy={CHART_DIM.cy}
                         innerRadius={CHART_DIM.innerRadius}
-                        outerRadius={CHART_DIM.outerRadius}
+                        outerRadius={activeIndex !== undefined ? CHART_DIM.outerRadiusActive : CHART_DIM.outerRadius}
                         activeIndex={activeIndex}
-                        activeOuterRadius={CHART_DIM.outerRadiusActive}
                         onMouseEnter={(_, index) => setActiveIndex(index)}
                         onClick={(_, index) => setActiveIndex(index)}
                         isAnimationActive

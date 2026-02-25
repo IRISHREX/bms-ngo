@@ -349,6 +349,36 @@ export async function createDonation(data: Partial<Donation>) {
   return post("/donations", data, false);
 }
 
+// ============ RAZORPAY ============
+
+export interface RazorpayOrderResponse {
+  orderId: string;
+  amount: number;
+  currency: string;
+  keyId: string;
+}
+
+export async function createRazorpayOrder(data: {
+  amount: number;
+  donorName: string;
+  type: string;
+  campaign?: string;
+}): Promise<RazorpayOrderResponse> {
+  return post<RazorpayOrderResponse>("/razorpay/order", data, false);
+}
+
+export async function verifyRazorpayPayment(data: {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+  donorName: string;
+  amount: number;
+  type: string;
+  campaign?: string;
+}): Promise<{ success: boolean; donationId: string; paymentId: string }> {
+  return post("/razorpay/verify", data, false);
+}
+
 export async function generateReceipt(id: string) {
   return post(`/donations/${id}/receipt`, {});
 }
