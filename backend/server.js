@@ -18,7 +18,11 @@ app.use(cors({
   origin: allowedOrigins,
   credentials: true,
 }));
-app.use(express.json());
+app.use((req, res, next) => {
+  // Skip JSON parsing for Razorpay webhook — it needs raw body for HMAC verification
+  if (req.originalUrl === "/api/razorpay/webhook") return next();
+  express.json()(req, res, next);
+});
 app.use((req, res, next) => {
   const start = Date.now();
 
@@ -68,6 +72,7 @@ app.use("/api/volunteers", require("./routes/volunteers"));
 app.use("/api/donations", require("./routes/donations"));
 app.use("/api/users", require("./routes/users"));
 app.use("/api/theme", require("./routes/theme"));
+app.use("/api/razorpay", require("./routes/razorpay"));
 
 // Health check
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
