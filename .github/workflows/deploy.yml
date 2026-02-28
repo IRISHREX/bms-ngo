@@ -21,11 +21,8 @@ jobs:
 
             git fetch --all
             git reset --hard origin/production
-
+            npm install
+            npm run build
             cd backend
             npm install
             pm2 reload bms-ngo
-
-            cd ../frontend
-            npm install
-            npm run build
