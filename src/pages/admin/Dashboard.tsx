@@ -4,11 +4,8 @@ import {
   deleteRecentActivityItem,
   fetchDashboardStats,
   fetchRecentActivity,
-  fetchThemeState,
   formatCurrency,
-  updateTheme,
 } from "@/lib/api";
-import { applyTheme, isThemeKey } from "@/lib/theme";
 import {
   IndianRupee,
   Users,
@@ -25,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { useI18n } from "@/lib/i18n";
+import { ThemeStudioDropdown } from "@/components/ThemeStudioDropdown";
 
 interface StatCardProps {
   title: string;
@@ -89,26 +87,6 @@ export default function Dashboard() {
     queryFn: fetchRecentActivity,
   });
 
-  const { data: themeState } = useQuery({
-    queryKey: ["theme-state"],
-    queryFn: fetchThemeState,
-  });
-
-  const themeMutation = useMutation({
-    mutationFn: updateTheme,
-    onSuccess: async (_data, themeKey) => {
-      if (isThemeKey(themeKey)) {
-        applyTheme(themeKey);
-        localStorage.setItem("ngo_theme_key", themeKey);
-      }
-      await queryClient.invalidateQueries({ queryKey: ["theme-state"] });
-      toast({ title: "Theme updated", description: `Applied ${themeKey}` });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Theme update failed", description: error.message, variant: "destructive" });
-    },
-  });
-
   const clearActivityMutation = useMutation({
     mutationFn: clearRecentActivity,
     onSuccess: async () => {
@@ -134,9 +112,12 @@ export default function Dashboard() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="page-header">{t("dashboard.title")}</h1>
-          <p className="page-description">{t("dashboard.subtitle")}</p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 className="page-header">{t("dashboard.title")}</h1>
+            <p className="page-description">{t("dashboard.subtitle")}</p>
+          </div>
+          <ThemeStudioDropdown />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
@@ -151,9 +132,12 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="page-header">{t("dashboard.title")}</h1>
-        <p className="page-description">{t("dashboard.subtitle")}</p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="page-header">{t("dashboard.title")}</h1>
+          <p className="page-description">{t("dashboard.subtitle")}</p>
+        </div>
+        <ThemeStudioDropdown />
       </div>
 
       <div>
@@ -175,29 +159,6 @@ export default function Dashboard() {
           <StatCard title={t("home.stats.students")} value={(stats?.studentsHelped ?? 0).toLocaleString()} icon={GraduationCap} description={t("dashboard.desc.education")} />
           <StatCard title={t("home.stats.meals")} value={(stats?.mealsServed ?? 0).toLocaleString()} icon={UtensilsCrossed} description={t("dashboard.desc.food")} />
           <StatCard title={t("home.stats.villages")} value={stats?.villagesReached ?? 0} icon={MapPin} description={t("dashboard.desc.states")} />
-        </div>
-      </div>
-
-      <div className="admin-card">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">{t("dashboard.themeStudio")}</h2>
-          <p className="text-xs text-muted-foreground">{t("dashboard.themeDesc")}</p>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
-          {(themeState?.themes || []).map((theme) => {
-            const active = themeState?.currentThemeKey === theme.themeKey;
-            return (
-              <Button
-                key={theme.themeKey}
-                variant={active ? "default" : "outline"}
-                className="justify-start"
-                onClick={() => themeMutation.mutate(theme.themeKey)}
-                disabled={themeMutation.isPending}
-              >
-                {theme.label}
-              </Button>
-            );
-          })}
         </div>
       </div>
 
