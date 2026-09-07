@@ -105,12 +105,36 @@ export interface Project {
 
 export interface Volunteer {
   id: string;
-  name: string;
-  phone: string;
-  email: string;
-  message: string;
-  type: "volunteer" | "partner" | "intern";
-  status: "new" | "contacted" | "approved" | "rejected";
+  applicationNo: string;
+  fullName: string;
+  fatherName?: string;
+  motherName?: string;
+  dob?: string;
+  gender?: "male" | "female" | "other";
+  age?: number;
+  maritalStatus?: "married" | "unmarried" | "other";
+  mobileNo: string;
+  whatsappNo?: string;
+  email?: string;
+  address?: string;
+  village?: string;
+  postOffice?: string;
+  policeStation?: string;
+  district?: string;
+  pinCode?: string;
+  education?: string;
+  occupation?: string;
+  aadhaarNo?: string;
+  panNo?: string;
+  joinReason?: string;
+  socialWorkInterest?: string[];
+  previousExperience?: string;
+  membershipType?: string;
+  photoPath?: string;
+  aadhaarPath?: string;
+  addressProofPath?: string;
+  otherDocPath?: string;
+  status: "pending" | "approved" | "rejected";
   createdAt: string;
 }
 
@@ -331,8 +355,16 @@ export async function fetchVolunteers(): Promise<Volunteer[]> {
   return get<Volunteer[]>("/volunteers", true);
 }
 
-export async function submitVolunteerForm(data: Partial<Volunteer>) {
-  return post("/volunteers", data, false);
+export async function submitVolunteerForm(form: FormData) {
+  const res = await fetch(`${BASE_URL}/volunteers`, {
+    method: "POST",
+    headers: {
+      // Omit Content-Type so browser sets boundary for multipart/form-data
+    },
+    body: form,
+  });
+  if (!res.ok) throw new Error(`Submission failed: ${res.status}`);
+  return res.json();
 }
 
 export async function updateVolunteerStatus(id: string, status: string) {
