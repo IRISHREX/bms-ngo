@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { jsPDF } from "jspdf";
+import { generateVolunteerPdf } from "@/lib/pdfGenerator";
 import { motion } from "framer-motion";
 import { useMutation } from "@tanstack/react-query";
 import { Users, Briefcase, GraduationCap } from "lucide-react";
@@ -21,40 +21,16 @@ export default function VolunteerPage() {
       toast({ title: t("volunteer.toast.successTitle"), description: t("volunteer.toast.successDesc") });
       
       try {
-        const doc = new jsPDF();
-        doc.setFontSize(18);
-        doc.text("Volunteer Application Acknowledgment", 20, 20);
-        
-        doc.setFontSize(12);
-        doc.text(`Thank you, ${variables.get("full_name") || "Volunteer"}, for your application!`, 20, 35);
-        doc.text("Your details have been successfully recorded as follows:", 20, 45);
-
-        const fields = [
-          { label: "Full Name", value: variables.get("full_name") },
-          { label: "Mobile No.", value: variables.get("mobile_no") },
-          { label: "Email", value: variables.get("email") },
-          { label: "Education", value: variables.get("education") },
-          { label: "Occupation", value: variables.get("occupation") },
-          { label: "Address", value: variables.get("address") },
-          { label: "Membership Type", value: variables.get("membership_type") }
-        ];
-
-        let y = 60;
-        fields.forEach(f => {
-          if (f.value && (f.value as string).trim() !== "") {
-            doc.text(`${f.label}: ${f.value}`, 20, y);
-            y += 10;
-          }
+        const vData: Record<string, any> = {};
+        variables.forEach((value, key) => {
+          vData[key] = value;
         });
-
-        doc.text("We will get back to you shortly.", 20, y + 10);
         
-        // Include Application Number if the API returns it in `data` (optional)
         if (data && data.application_no) {
-          doc.text(`Application No: ${data.application_no}`, 20, y + 20);
+          vData.applicationNo = data.application_no;
         }
 
-        doc.save("volunteer_acknowledgment.pdf");
+        generateVolunteerPdf(vData);
       } catch (err) {
         console.error("Failed to generate PDF", err);
       }

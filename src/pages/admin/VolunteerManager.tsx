@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { jsPDF } from "jspdf";
+import { generateVolunteerPdf } from "@/lib/pdfGenerator";
 import { fetchVolunteers, formatDate, updateVolunteerStatus, type Volunteer } from "@/lib/api";
 import { authHeaders } from "@/lib/auth";
 import { Search, Download, Eye } from "lucide-react";
@@ -68,30 +68,7 @@ export default function VolunteerManager() {
 
   const downloadVolunteerPdf = (v: Volunteer) => {
     try {
-      const doc = new jsPDF();
-      doc.setFontSize(18);
-      doc.text("Volunteer Application Details", 20, 20);
-      
-      doc.setFontSize(12);
-      
-      const fields = [
-        { label: "Full Name", value: v.fullName },
-        { label: "Mobile No.", value: v.mobileNo },
-        { label: "Email", value: v.email },
-        { label: "Membership Type", value: v.membershipType },
-        { label: "Status", value: v.status },
-        { label: "Date Applied", value: formatDate(v.createdAt) },
-      ];
-
-      let y = 40;
-      fields.forEach(f => {
-        if (f.value) {
-          doc.text(`${f.label}: ${f.value}`, 20, y);
-          y += 10;
-        }
-      });
-
-      doc.save(`volunteer_${v.fullName?.replace(/\s+/g, '_') || v.id}.pdf`);
+      generateVolunteerPdf(v);
     } catch (err) {
       console.error("Failed to generate PDF", err);
       toast({ title: "Failed to generate PDF", variant: "destructive" });
