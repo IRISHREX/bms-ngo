@@ -1,0 +1,222 @@
+<?php
+namespace App\Controllers;
+
+use Psr\Http\Message\ResponseInterface as Response;
+use Psr\Http\Message\ServerRequestInterface as Request;
+use App\Config\Database;
+use PDO;
+use PDOException;
+
+class VolunteersController {
+    private $db;
+
+    public function __construct() {
+        $database = new Database();
+        $this->db = $database->getConnection();
+    }
+
+    public function getAll(Request $request, Response $response, $args) {
+        try {
+            $stmt = $this->db->query("SELECT * FROM volunteers ORDER BY created_at DESC");
+            $rows = $stmt->fetchAll();
+            $volunteers = array_map([$this, 'mapVolunteer'], $rows);
+
+            $response->getBody()->write(json_encode($volunteers));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(200);
+        } catch (PDOException $e) {
+            $response->getBody()->write(json_encode(["error" => $e->getMessage()]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(500);
+        }
+    }
+
+    public function create(Request $request, Response $response, $args) {
+        $body = $request->getParsedBody();
+        $uploadedFiles = $request->getUploadedFiles();
+
+        $fullName = $body['full_name'] ?? null;
+        if (!$fullName) {
+            $response->getBody()->write(json_encode(["error" => "Full Name is required"]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+        }
+
+        // Handle file uploads
+        $uploadDir = $_ENV['UPLOAD_DIR'] ?? __DIR__ . '/../../public/uploads/volunteers';
+        if (!is_dir($uploadDir)) {
+            @mkdir($uploadDir, 0777, true);
+        }
+
+        $photoPath = $this->handleFileUpload($uploadedFiles['photo_file'] ?? null, $uploadDir);
+        $aadhaarPath = $this->handleFileUpload($uploadedFiles['aadhaar_file'] ?? null, $uploadDir);
+        $addressProofPath = $this->handleFileUpload($uploadedFiles['address_proof_file'] ?? null, $uploadDir);
+        $otherDocPath = $this->handleFileUpload($uploadedFiles['other_doc_file'] ?? null, $uploadDir);
+
+        try {
+            $stmt = $this->db->prepare("INSERT INTO volunteers (
+                application_no, full_name, father_name, mother_name, dob, gender, age, 
+                marital_status, mobile_no, whatsapp_no, email, address, village, 
+                post_office, police_station, district, pin_code, education, occupation, 
+                aadhaar_no, pan_no, join_reason, social_work_interest, previous_experience, 
+                membership_type, photo_path, aadhaar_path, address_proof_path, other_doc_path
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            
+            $applicationNo = 'APP-' . strtoupper(uniqid());
+
+            $age = $body['age'] ?? null;
+            if ($age === '') $age = null;
+
+            $dob = $body['dob'] ?? null;
+            if ($dob === '') $dob = null;
+
+            $swi = $body['social_work_interest'] ?? null;
+            if (empty($swi)) {
+                $swi = null;
+            } else {
+                if (!is_array($swi)) {
+                    $swi = [$swi];
+                }
+                $swi = json_encode($swi);
+            }
+
+            $stmt->execute([
+                $applicationNo,
+                $fullName,
+                $body['father_name'] ?? null,
+                $body['mother_name'] ?? null,
+                $dob,
+                $body['gender'] ?? null,
+                $age,
+                $body['marital_status'] ?? null,
+                $body['mobile_no'] ?? null,
+                $body['whatsapp_no'] ?? null,
+                $body['email'] ?? null,
+                $body['address'] ?? null,
+                $body['village'] ?? null,
+                $body['post_office'] ?? null,
+                $body['police_station'] ?? null,
+                $body['district'] ?? null,
+                $body['pin_code'] ?? null,
+                $body['education'] ?? null,
+                $body['occupation'] ?? null,
+                $body['aadhaar_no'] ?? null,
+                $body['pan_no'] ?? null,
+                $body['join_reason'] ?? null,
+                $swi,
+                $body['previous_experience'] ?? null,
+                $body['membership_type'] ?? null,
+                $photoPath,
+                $aadhaarPath,
+                $addressProofPath,
+                $otherDocPath
+            ]);
+            
+            $insertId = $this->db->lastInsertId();
+
+            $response->getBody()->write(json_encode(["id" => (string)$insertId, "application_no" => $applicationNo, "message" => "Application submitted successfully."]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(201);
+        } catch (PDOException $e) {
+            $response->getBody()->write(json_encode(["error" => $e->getMessage()]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(500);
+        }
+    }
+
+    private function handleFileUpload($uploadedFile, $uploadDir) {
+        if ($uploadedFile && $uploadedFile->getError() === UPLOAD_ERR_OK) {
+            $ext = pathinfo($uploadedFile->getClientFilename(), PATHINFO_EXTENSION);
+            $filename = uniqid() . '-' . time() . '.' . $ext;
+            $targetPath = $uploadDir . DIRECTORY_SEPARATOR . $filename;
+            $uploadedFile->moveTo($targetPath);
+            // Return relative path or URL depending on setup. Using relative path for now.
+            return 'uploads/volunteers/' . $filename;
+        }
+        return null;
+    }
+
+    public function update(Request $request, Response $response, $args) {
+        $id = $args['id'];
+        $body = json_decode($request->getBody(), true);
+        $status = $body['status'] ?? null;
+        
+        if (!$status) {
+            $response->getBody()->write(json_encode(["error" => "Status is required"]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+        }
+
+        try {
+            $stmt = $this->db->prepare("UPDATE volunteers SET status = ? WHERE id = ?");
+            $stmt->execute([$status, $id]);
+            
+            $response->getBody()->write(json_encode(["message" => "Volunteer updated"]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(200);
+        } catch (PDOException $e) {
+            $response->getBody()->write(json_encode(["error" => $e->getMessage()]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(500);
+        }
+    }
+
+    public function export(Request $request, Response $response, $args) {
+        try {
+            $stmt = $this->db->query("SELECT * FROM volunteers ORDER BY created_at DESC");
+            $rows = $stmt->fetchAll();
+            
+            $csv = "Name,Phone,Email,Type,Status,Date\n";
+            foreach ($rows as $r) {
+                // Escape quotes for CSV
+                $appNo = str_replace('"', '""', $r['application_no'] ?? '');
+                $name = str_replace('"', '""', $r['full_name']);
+                $phone = str_replace('"', '""', $r['mobile_no']);
+                $email = str_replace('"', '""', $r['email']);
+                $type = str_replace('"', '""', $r['membership_type'] ?? '');
+                $status = str_replace('"', '""', $r['status']);
+                $date = str_replace('"', '""', $r['created_at']);
+                
+                $csv .= "\"$appNo\",\"$name\",\"$phone\",\"$email\",\"$type\",\"$status\",\"$date\"\n";
+            }
+
+            $response->getBody()->write($csv);
+            return $response
+                ->withHeader('Content-Type', 'text/csv')
+                ->withHeader('Content-Disposition', 'attachment; filename="volunteers.csv"')
+                ->withStatus(200);
+        } catch (PDOException $e) {
+            $response->getBody()->write(json_encode(["error" => $e->getMessage()]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(500);
+        }
+    }
+
+    private function mapVolunteer($row) {
+        return [
+            'id' => (string)$row['id'],
+            'applicationNo' => $row['application_no'],
+            'fullName' => $row['full_name'],
+            'fatherName' => $row['father_name'],
+            'motherName' => $row['mother_name'],
+            'dob' => $row['dob'],
+            'gender' => $row['gender'],
+            'age' => $row['age'],
+            'maritalStatus' => $row['marital_status'],
+            'mobileNo' => $row['mobile_no'],
+            'whatsappNo' => $row['whatsapp_no'],
+            'email' => $row['email'],
+            'address' => $row['address'],
+            'village' => $row['village'],
+            'postOffice' => $row['post_office'],
+            'policeStation' => $row['police_station'],
+            'district' => $row['district'],
+            'pinCode' => $row['pin_code'],
+            'education' => $row['education'],
+            'occupation' => $row['occupation'],
+            'aadhaarNo' => $row['aadhaar_no'],
+            'panNo' => $row['pan_no'],
+            'joinReason' => $row['join_reason'],
+            'socialWorkInterest' => $row['social_work_interest'],
+            'previousExperience' => $row['previous_experience'],
+            'membershipType' => $row['membership_type'],
+            'photoPath' => $row['photo_path'],
+            'aadhaarPath' => $row['aadhaar_path'],
+            'addressProofPath' => $row['address_proof_path'],
+            'otherDocPath' => $row['other_doc_path'],
+            'status' => $row['status'],
+            'createdAt' => $row['created_at'],
+        ];
+    }
+}

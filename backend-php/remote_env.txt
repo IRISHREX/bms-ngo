@@ -1,0 +1,23 @@
+DB_HOST=127.0.0.1
+DB_USER=u832627210_hopeUser
+DB_PASSWORD=Sohel@34892
+DB_NAME=u832627210_hopeNgo
+JWT_SECRET=change_this_to_a_long_random_secret
+UPLOAD_DIR=./uploads
+UPLOAD_URL=https://api.hopefoundationmsd.org/uploads
+PORT=5000
+FRONTEND_URL=https://hopefoundationmsd.org/
+LOG_LEVEL=info
+LOG_RETENTION_MS=36000
+LOG_CLEANUP_INTERVAL_MS=3000
+
+# Razorpay keys (get from https://dashboard.razorpay.com/app/keys)
+RAZORPAY_KEY_ID=rzp_test_XXXXXXXXXXXXXX
+RAZORPAY_KEY_SECRET=your_razorpay_key_secret
+# Webhook secret (set in Razorpay Dashboard → Webhooks → Secret)
+RAZORPAY_WEBHOOK_SECRET=your_razorpay_webhook_secret
+
+# Admin seeded by `node seed.js`
+ADMIN_SEED_NAME="Sohel Islam"
+ADMIN_SEED_EMAIL=Sohel.Islam@Ibm.com
+ADMIN_SEED_PASSWORD=Sohel@34892

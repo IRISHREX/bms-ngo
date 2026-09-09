@@ -21,6 +21,7 @@ export default function DonatePage() {
   const { t, locale } = useI18n();
   const [amount, setAmount] = useState<number>(1000);
   const [donationType, setDonationType] = useState<"one-time" | "monthly">("one-time");
+  const [paymentMethod, setPaymentMethod] = useState<"online" | "offline">("online");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -105,8 +106,28 @@ export default function DonatePage() {
       <section className="py-16">
         <div className="container mx-auto px-4 max-w-lg">
           <div className="admin-card space-y-6">
-            {/* Donation type toggle */}
+            {/* Payment Method toggle */}
             <div>
+              <Label className="text-sm font-medium mb-3 block">Payment Method</Label>
+              <div className="flex gap-2">
+                {(["online", "offline"] as const).map((method) => (
+                  <button
+                    key={method}
+                    onClick={() => setPaymentMethod(method)}
+                    className={`flex-1 py-2.5 rounded-md text-sm font-medium transition-colors ${
+                      paymentMethod === method ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"
+                    }`}
+                  >
+                    {method === "online" ? "Online Payment" : "Bank Transfer (Offline)"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {paymentMethod === "online" ? (
+              <>
+                {/* Donation type toggle */}
+                <div>
               <Label className="text-sm font-medium mb-3 block">{t("donate.type")}</Label>
               <div className="flex gap-2">
                 {(["one-time", "monthly"] as const).map((type) => (
@@ -187,13 +208,52 @@ export default function DonatePage() {
               <ArrowRight className="w-4 h-4" />
             </Button>
 
-            {/* Trust badges */}
             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
               <ShieldCheck className="w-4 h-4" />
               <span>Secured by Razorpay • 256-bit SSL encryption</span>
             </div>
 
             <p className="text-xs text-muted-foreground text-center">{t("donate.taxNote")}</p>
+              </>
+            ) : (
+              <div className="bg-muted p-6 rounded-lg text-left space-y-4">
+                <h3 className="text-lg font-semibold border-b pb-2">Bank Transfer Details</h3>
+                <p className="text-sm text-muted-foreground">You can make a direct bank transfer to our official NGO account using the details below:</p>
+                <div className="space-y-2 text-sm font-medium">
+                  <div className="flex justify-between border-b pb-1">
+                    <span className="text-muted-foreground">Bank Name:</span>
+                    <span>SBI (State Bank of India)</span>
+                  </div>
+                  <div className="flex justify-between border-b pb-1">
+                    <span className="text-muted-foreground">Account Name:</span>
+                    <span>HOPE FOUNDATION TRUST</span>
+                  </div>
+                  <div className="flex justify-between border-b pb-1">
+                    <span className="text-muted-foreground">Account Number:</span>
+                    <span>45486654467</span>
+                  </div>
+                  <div className="flex justify-between border-b pb-1">
+                    <span className="text-muted-foreground">Branch:</span>
+                    <span>NEW FARAKKA</span>
+                  </div>
+                  <div className="flex justify-between border-b pb-1">
+                    <span className="text-muted-foreground">IFSC Code:</span>
+                    <span>SBIN0018784</span>
+                  </div>
+                  <div className="flex justify-between border-b pb-1">
+                    <span className="text-muted-foreground">MICR Code:</span>
+                    <span>742002607</span>
+                  </div>
+                  <div className="flex flex-col gap-1 border-b pb-1">
+                    <span className="text-muted-foreground">Branch Address:</span>
+                    <span className="leading-relaxed">NEAR NEW FARAKKA RAILWAY STATION P.O-FARAKKA, DIST-MURSHIDABAD WEST</span>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-4">
+                  After completing the transfer, please email your transaction receipt to our support team for the 80G tax exemption receipt.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </section>

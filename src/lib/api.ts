@@ -134,7 +134,7 @@ export interface Volunteer {
   aadhaarPath?: string;
   addressProofPath?: string;
   otherDocPath?: string;
-  status: "pending" | "approved" | "rejected";
+  status: "new" | "contacted" | "approved" | "rejected";
   createdAt: string;
 }
 

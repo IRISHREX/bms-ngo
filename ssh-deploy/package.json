@@ -1,0 +1,11 @@
+{
+  "name": "ssh-deploy",
+  "version": "1.0.0",
+  "description": "Universal SSH deployment tool for any project",
+  "scripts": {
+    "deploy": "node deploy.js"
+  },
+  "dependencies": {
+    "node-ssh": "^13.2.0"
+  }
+}

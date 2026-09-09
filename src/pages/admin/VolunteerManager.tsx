@@ -36,7 +36,10 @@ export default function VolunteerManager() {
   });
 
   const filtered = volunteers.filter(
-    (v) => v.name.toLowerCase().includes(search.toLowerCase()) || v.email.toLowerCase().includes(search.toLowerCase())
+    (v) =>
+      v.fullName.toLowerCase().includes(search.toLowerCase()) ||
+      (v.email ?? "").toLowerCase().includes(search.toLowerCase()) ||
+      (v.mobileNo ?? "").includes(search)
   );
 
   const exportCsv = async () => {
@@ -84,6 +87,7 @@ export default function VolunteerManager() {
           <thead>
             <tr className="border-b border-border">
               <th className="table-header text-left px-4 py-3">Name</th>
+              <th className="table-header text-left px-4 py-3">Mobile</th>
               <th className="table-header text-left px-4 py-3">Email</th>
               <th className="table-header text-left px-4 py-3">Type</th>
               <th className="table-header text-left px-4 py-3">Status</th>
@@ -94,13 +98,14 @@ export default function VolunteerManager() {
           <tbody>
             {isLoading
               ? Array.from({ length: 3 }).map((_, i) => (
-                  <tr key={i} className="border-b border-border"><td colSpan={6} className="px-4 py-3"><div className="h-5 bg-muted rounded animate-pulse" /></td></tr>
+                  <tr key={i} className="border-b border-border"><td colSpan={7} className="px-4 py-3"><div className="h-5 bg-muted rounded animate-pulse" /></td></tr>
                 ))
               : filtered.map((v) => (
                   <tr key={v.id} className="border-b border-border hover:bg-muted/50 transition-colors">
-                    <td className="px-4 py-3 text-sm font-medium">{v.name}</td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">{v.email}</td>
-                    <td className="px-4 py-3"><Badge variant="outline" className="text-xs capitalize">{v.type}</Badge></td>
+                    <td className="px-4 py-3 text-sm font-medium">{v.fullName}</td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">{v.mobileNo ?? "—"}</td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">{v.email ?? "—"}</td>
+                    <td className="px-4 py-3"><Badge variant="outline" className="text-xs capitalize">{v.membershipType ?? "—"}</Badge></td>
                     <td className="px-4 py-3">
                       <Select value={v.status} onValueChange={(val) => handleStatusChange(v.id, val as Volunteer["status"])}>
                         <SelectTrigger className="h-8 w-[130px]" disabled={updatingId === v.id}>
