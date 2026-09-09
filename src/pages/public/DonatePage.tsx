@@ -21,7 +21,6 @@ export default function DonatePage() {
   const { t, locale } = useI18n();
   const [amount, setAmount] = useState<number>(1000);
   const [donationType, setDonationType] = useState<"one-time" | "monthly">("one-time");
-  const [donationType, setDonationType] = useState<"one-time" | "monthly">("one-time");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");

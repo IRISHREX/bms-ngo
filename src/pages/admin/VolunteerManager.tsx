@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { jsPDF } from "jspdf";
 import { fetchVolunteers, formatDate, updateVolunteerStatus, type Volunteer } from "@/lib/api";
 import { authHeaders } from "@/lib/auth";
 import { Search, Download, Eye } from "lucide-react";
@@ -65,6 +66,38 @@ export default function VolunteerManager() {
     updateStatusMutation.mutate({ id, status });
   };
 
+  const downloadVolunteerPdf = (v: Volunteer) => {
+    try {
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.text("Volunteer Application Details", 20, 20);
+      
+      doc.setFontSize(12);
+      
+      const fields = [
+        { label: "Full Name", value: v.fullName },
+        { label: "Mobile No.", value: v.mobileNo },
+        { label: "Email", value: v.email },
+        { label: "Membership Type", value: v.membershipType },
+        { label: "Status", value: v.status },
+        { label: "Date Applied", value: formatDate(v.createdAt) },
+      ];
+
+      let y = 40;
+      fields.forEach(f => {
+        if (f.value) {
+          doc.text(`${f.label}: ${f.value}`, 20, y);
+          y += 10;
+        }
+      });
+
+      doc.save(`volunteer_${v.fullName?.replace(/\s+/g, '_') || v.id}.pdf`);
+    } catch (err) {
+      console.error("Failed to generate PDF", err);
+      toast({ title: "Failed to generate PDF", variant: "destructive" });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -120,7 +153,10 @@ export default function VolunteerManager() {
                       </Select>
                     </td>
                     <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(v.createdAt)}</td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-right flex items-center justify-end gap-2">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => downloadVolunteerPdf(v)} title="Download PDF">
+                        <Download className="w-4 h-4 text-muted-foreground" />
+                      </Button>
                       <Badge variant={statusColors[v.status]} className="text-xs capitalize">
                         <Eye className="w-3 h-3 mr-1" />
                         {v.status}
