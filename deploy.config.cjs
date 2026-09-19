@@ -51,6 +51,7 @@ module.exports = {
           local:  'backend-php/public',
           remote: '/home/u832627210/domains/hopefoundationmsd.org/public_html/api/public',
           label:  'backend-php/public/',
+          ignore: ['uploads'],
         },
         {
           local:  'backend-php/src',
@@ -59,6 +60,10 @@ module.exports = {
         },
       ],
       uploadFiles: [
+        {
+          local:  'backend-php/public/.htaccess',
+          remote: '/home/u832627210/domains/hopefoundationmsd.org/public_html/api/public/.htaccess',
+        },
         {
           local:  'backend-php/composer.json',
           remote: '/home/u832627210/domains/hopefoundationmsd.org/public_html/api/composer.json',
@@ -74,6 +79,10 @@ module.exports = {
         },
       ],
       afterDeploy: [
+        {
+          cmd: 'mkdir -p /home/u832627210/domains/hopefoundationmsd.org/public_html/api/public/uploads/volunteers && cd /home/u832627210/domains/hopefoundationmsd.org/public_html/api/public/uploads && cp -n *.png *.jpg *.jpeg *.pdf volunteers/ 2>/dev/null || true',
+          label: 'sync legacy uploads to volunteers dir',
+        },
         {
           cmd: 'chmod -R 755 /home/u832627210/domains/hopefoundationmsd.org/public_html/api/public/uploads',
           label: 'chmod uploads',
