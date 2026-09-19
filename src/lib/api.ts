@@ -59,6 +59,7 @@ export interface FileItem {
   uploadedAt: string;
   usedIn: string;
   url: string;
+  downloadUrl?: string;
 }
 
 export interface GalleryItem {
@@ -134,6 +135,10 @@ export interface Volunteer {
   aadhaarPath?: string;
   addressProofPath?: string;
   otherDocPath?: string;
+  photoDownloadUrl?: string;
+  aadhaarDownloadUrl?: string;
+  addressProofDownloadUrl?: string;
+  otherDocDownloadUrl?: string;
   status: "new" | "contacted" | "approved" | "rejected";
   createdAt: string;
 }

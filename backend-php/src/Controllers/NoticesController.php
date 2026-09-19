@@ -115,7 +115,7 @@ class NoticesController {
             'id' => (string)$row['id'],
             'title' => $row['title'],
             'description' => $row['description'],
-            'attachmentUrl' => $row['attachment_file_id'] ? "/api/files/{$row['attachment_file_id']}" : null,
+            'attachmentUrl' => !empty($row['attachment_file_id']) ? "/api/files/{$row['attachment_file_id']}/download" : null,
             'publishDate' => $row['publish_date'],
             'expiryDate' => $row['expiry_date'],
             'pinned' => (bool)$row['pinned'],

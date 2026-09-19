@@ -44,7 +44,8 @@ class FilesController {
                     'uploadedBy' => $f['uploaded_by'],
                     'uploadedAt' => $f['created_at'],
                     'usedIn' => $f['used_in'] ?? '',
-                    'url' => $this->getUploadUrl() . '/' . $f['folder'] . '/' . $filename
+                    'url' => $this->getUploadUrl() . '/' . $f['folder'] . '/' . $filename,
+                    'downloadUrl' => '/api/files/' . $f['id'] . '/download'
                 ];
             }
 
@@ -147,5 +148,95 @@ class FilesController {
             $response->getBody()->write(json_encode(["error" => $e->getMessage()]));
             return $response->withHeader('Content-Type', 'application/json')->withStatus(500);
         }
+    }
+
+    public function getById(Request $request, Response $response, $args) {
+        $id = $args['id'];
+        try {
+            $stmt = $this->db->prepare("SELECT * FROM files WHERE id = ?");
+            $stmt->execute([$id]);
+            $f = $stmt->fetch();
+
+            if (!$f) {
+                $response->getBody()->write(json_encode(["error" => "File not found"]));
+                return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
+            }
+
+            $filename = basename($f['file_path']);
+            $data = [
+                'id' => (string)$f['id'],
+                'name' => $f['name'],
+                'type' => $f['type'],
+                'size' => $f['size'],
+                'folder' => $f['folder'],
+                'uploadedBy' => $f['uploaded_by'],
+                'uploadedAt' => $f['created_at'],
+                'usedIn' => $f['used_in'] ?? '',
+                'url' => $this->getUploadUrl() . '/' . $f['folder'] . '/' . $filename,
+                'downloadUrl' => '/api/files/' . $f['id'] . '/download'
+            ];
+
+            $response->getBody()->write(json_encode($data));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(200);
+        } catch (PDOException $e) {
+            $response->getBody()->write(json_encode(["error" => $e->getMessage()]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(500);
+        }
+    }
+
+    public function download(Request $request, Response $response, $args) {
+        $id = $args['id'];
+        try {
+            $stmt = $this->db->prepare("SELECT * FROM files WHERE id = ?");
+            $stmt->execute([$id]);
+            $file = $stmt->fetch();
+
+            if (!$file) {
+                $response->getBody()->write(json_encode(["error" => "File not found"]));
+                return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
+            }
+
+            $path = $this->resolveFilePath($file['file_path'], $file['folder']);
+            if (!$path || !file_exists($path)) {
+                $response->getBody()->write(json_encode(["error" => "File not found on disk"]));
+                return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
+            }
+
+            $mime = function_exists('mime_content_type') ? @mime_content_type($path) : null;
+            if (!$mime) {
+                $mime = 'application/octet-stream';
+            }
+            $downloadName = $file['name'] ?: basename($path);
+
+            $stream = new \Slim\Psr7\Stream(fopen($path, 'rb'));
+            return $response
+                ->withBody($stream)
+                ->withHeader('Content-Type', $mime)
+                ->withHeader('Content-Disposition', 'attachment; filename="' . addslashes($downloadName) . '"')
+                ->withHeader('Content-Length', (string)filesize($path));
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode(["error" => $e->getMessage()]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(500);
+        }
+    }
+
+    private function resolveFilePath($storedPath, $folder = '') {
+        if (!empty($storedPath) && file_exists($storedPath)) return $storedPath;
+
+        $basename = basename($storedPath);
+        $candidates = [
+            $this->uploadDir . DIRECTORY_SEPARATOR . $folder . DIRECTORY_SEPARATOR . $basename,
+            $this->uploadDir . DIRECTORY_SEPARATOR . $basename,
+            __DIR__ . '/../../public/uploads/' . $folder . '/' . $basename,
+            __DIR__ . '/../../public/uploads/' . $basename,
+            __DIR__ . '/../../uploads/' . $folder . '/' . $basename,
+            __DIR__ . '/../../uploads/' . $basename,
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (file_exists($candidate)) return $candidate;
+        }
+
+        return null;
     }
 }

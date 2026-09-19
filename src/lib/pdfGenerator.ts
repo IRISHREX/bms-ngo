@@ -85,7 +85,13 @@ export const generateVolunteerPdf = (v: Partial<Volunteer> | Record<string, any>
     ["Social Work Interest", Array.isArray(v.socialWorkInterest || v.social_work_interest) ? (v.socialWorkInterest || v.social_work_interest).join(", ") : (v.socialWorkInterest || v.social_work_interest || "N/A")],
     ["Previous Experience", v.previousExperience || v.previous_experience || "N/A"],
     ["Membership Type", v.membershipType || v.membership_type || "N/A"],
-    ["Status", v.status || "new"]
+    ["Status", v.status || "new"],
+
+    [{ content: "Verification Documents", colSpan: 2, styles: { fontStyle: "bold", fillColor: [240, 240, 240] } }],
+    ["Passport Photo", (v.photoPath || v.photo_path) ? "Uploaded & Verified" : "Not Provided"],
+    ["Aadhaar Card Copy", (v.aadhaarPath || v.aadhaar_path) ? "Uploaded & Verified" : "Not Provided"],
+    ["Address Proof Copy", (v.addressProofPath || v.address_proof_path) ? "Uploaded & Verified" : "Not Provided"],
+    ["Other Attachments", (v.otherDocPath || v.other_doc_path) ? "Uploaded & Verified" : "Not Provided"]
   ];
 
   autoTable(doc, {

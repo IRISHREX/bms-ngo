@@ -58,6 +58,11 @@ return function (App $app) {
         // Theme (Public read)
         $group->get('/theme', [ThemeController::class, 'getTheme']);
 
+        // Files & Document Downloads (Public read/stream)
+        $group->get('/files/{id}', [FilesController::class, 'getById']);
+        $group->get('/files/{id}/download', [FilesController::class, 'download']);
+        $group->get('/volunteers/{id}/document/{type}', [VolunteersController::class, 'downloadDocument']);
+
         // --- PROTECTED ROUTES --- //
         $group->group('', function (RouteCollectorProxy $protected) {
             

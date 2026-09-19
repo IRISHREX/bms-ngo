@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { deleteFile, fetchFiles, formatDate, formatFileSize, uploadFile, type FileItem } from "@/lib/api";
-import { FolderOpen, FileText, Image, Film, Upload, Trash2, Search } from "lucide-react";
+import { FolderOpen, FileText, Image, Film, Upload, Trash2, Search, Download, ExternalLink, Copy } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +25,47 @@ export default function FileManager() {
   const [uploadFolder, setUploadFolder] = useState("gallery");
   const [usedIn, setUsedIn] = useState("Gallery");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+
+  const resolveFileUrl = (f: FileItem) => {
+    if (f.url && (f.url.startsWith("http://") || f.url.startsWith("https://"))) {
+      return f.url;
+    }
+    const base = import.meta.env.VITE_API_URL || "/api";
+    if (f.downloadUrl) {
+      if (f.downloadUrl.startsWith("/api")) {
+        const apiOrigin = base.replace(/\/api\/?$/, "");
+        return `${apiOrigin}${f.downloadUrl}`;
+      }
+      return `${base}${f.downloadUrl}`;
+    }
+    const baseUploads = base.replace(/\/api\/?$/, "") + "/uploads";
+    return `${baseUploads}/${f.folder}/${f.name}`;
+  };
+
+  const downloadFile = async (f: FileItem) => {
+    const url = resolveFileUrl(f);
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = f.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      window.open(url, "_blank");
+    }
+  };
+
+  const copyFileLink = (f: FileItem) => {
+    const url = resolveFileUrl(f);
+    navigator.clipboard.writeText(url);
+    toast({ title: "Link copied", description: "File URL copied to clipboard." });
+  };
 
   const uploadMutation = useMutation({
     mutationFn: async ({ filesToUpload, folder, section }: { filesToUpload: File[]; folder: string; section: string }) => {
@@ -136,7 +177,44 @@ export default function FileManager() {
                     <td className="px-4 py-3 text-sm text-muted-foreground">{file.usedIn}</td>
                     <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(file.uploadedAt)}</td>
                     <td className="px-4 py-3 text-right">
-                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => openDelete(file)}><Trash2 className="w-4 h-4" /></Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          title="Open in new tab"
+                          onClick={() => window.open(resolveFileUrl(file), "_blank")}
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          title="Download file"
+                          onClick={() => downloadFile(file)}
+                        >
+                          <Download className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          title="Copy file URL"
+                          onClick={() => copyFileLink(file)}
+                        >
+                          <Copy className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          title="Delete file"
+                          onClick={() => openDelete(file)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 );

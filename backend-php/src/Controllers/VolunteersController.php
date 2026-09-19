@@ -40,15 +40,19 @@ class VolunteersController {
         }
 
         // Handle file uploads
-        $uploadDir = $_ENV['UPLOAD_DIR'] ?? __DIR__ . '/../../public/uploads/volunteers';
-        if (!is_dir($uploadDir)) {
-            @mkdir($uploadDir, 0777, true);
+        $baseUploadDir = $_ENV['UPLOAD_DIR'] ?? (__DIR__ . '/../../public/uploads');
+        if (!is_dir($baseUploadDir)) {
+            @mkdir($baseUploadDir, 0777, true);
+        }
+        $volunteersUploadDir = rtrim($baseUploadDir, '/\\') . DIRECTORY_SEPARATOR . 'volunteers';
+        if (!is_dir($volunteersUploadDir)) {
+            @mkdir($volunteersUploadDir, 0777, true);
         }
 
-        $photoPath = $this->handleFileUpload($uploadedFiles['photo_file'] ?? null, $uploadDir);
-        $aadhaarPath = $this->handleFileUpload($uploadedFiles['aadhaar_file'] ?? null, $uploadDir);
-        $addressProofPath = $this->handleFileUpload($uploadedFiles['address_proof_file'] ?? null, $uploadDir);
-        $otherDocPath = $this->handleFileUpload($uploadedFiles['other_doc_file'] ?? null, $uploadDir);
+        $photoPath = $this->handleFileUpload($uploadedFiles['photo_file'] ?? null, $volunteersUploadDir, 'volunteers');
+        $aadhaarPath = $this->handleFileUpload($uploadedFiles['aadhaar_file'] ?? null, $volunteersUploadDir, 'volunteers');
+        $addressProofPath = $this->handleFileUpload($uploadedFiles['address_proof_file'] ?? null, $volunteersUploadDir, 'volunteers');
+        $otherDocPath = $this->handleFileUpload($uploadedFiles['other_doc_file'] ?? null, $volunteersUploadDir, 'volunteers');
 
         try {
             $stmt = $this->db->prepare("INSERT INTO volunteers (
@@ -119,14 +123,13 @@ class VolunteersController {
         }
     }
 
-    private function handleFileUpload($uploadedFile, $uploadDir) {
+    private function handleFileUpload($uploadedFile, $uploadDir, $folderName = 'volunteers') {
         if ($uploadedFile && $uploadedFile->getError() === UPLOAD_ERR_OK) {
             $ext = pathinfo($uploadedFile->getClientFilename(), PATHINFO_EXTENSION);
             $filename = uniqid() . '-' . time() . '.' . $ext;
-            $targetPath = $uploadDir . DIRECTORY_SEPARATOR . $filename;
+            $targetPath = rtrim($uploadDir, '/\\') . DIRECTORY_SEPARATOR . $filename;
             $uploadedFile->moveTo($targetPath);
-            // Return relative path or URL depending on setup. Using relative path for now.
-            return 'uploads/volunteers/' . $filename;
+            return 'uploads/' . $folderName . '/' . $filename;
         }
         return null;
     }
@@ -183,6 +186,103 @@ class VolunteersController {
         }
     }
 
+    public function downloadDocument(Request $request, Response $response, $args) {
+        $id = $args['id'];
+        $type = $args['type']; // 'photo', 'aadhaar', 'address_proof', 'other_doc'
+
+        $columnMap = [
+            'photo' => 'photo_path',
+            'aadhaar' => 'aadhaar_path',
+            'address_proof' => 'address_proof_path',
+            'other_doc' => 'other_doc_path'
+        ];
+
+        if (!isset($columnMap[$type])) {
+            $response->getBody()->write(json_encode(["error" => "Invalid document type"]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+        }
+
+        $col = $columnMap[$type];
+        try {
+            $stmt = $this->db->prepare("SELECT id, full_name, {$col} as doc_path FROM volunteers WHERE id = ?");
+            $stmt->execute([$id]);
+            $row = $stmt->fetch();
+
+            if (!$row || empty($row['doc_path'])) {
+                $response->getBody()->write(json_encode(["error" => "Document not found"]));
+                return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
+            }
+
+            $filePath = $this->resolveVolunteerFilePath($row['doc_path']);
+            if (!$filePath || !file_exists($filePath)) {
+                $response->getBody()->write(json_encode(["error" => "File not found on disk"]));
+                return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
+            }
+
+            $mime = function_exists('mime_content_type') ? @mime_content_type($filePath) : null;
+            if (!$mime) {
+                $mime = 'application/octet-stream';
+            }
+
+            $ext = pathinfo($filePath, PATHINFO_EXTENSION);
+            $safeName = preg_replace('/[^a-zA-Z0-9_-]/', '_', $row['full_name']);
+            $downloadFilename = "volunteer_{$safeName}_{$type}.{$ext}";
+
+            $stream = new \Slim\Psr7\Stream(fopen($filePath, 'rb'));
+            return $response
+                ->withBody($stream)
+                ->withHeader('Content-Type', $mime)
+                ->withHeader('Content-Disposition', 'attachment; filename="' . $downloadFilename . '"')
+                ->withHeader('Content-Length', (string)filesize($filePath));
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode(["error" => $e->getMessage()]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(500);
+        }
+    }
+
+    private function resolveVolunteerFilePath($storedPath) {
+        if (!empty($storedPath) && file_exists($storedPath)) return $storedPath;
+
+        $basename = basename($storedPath);
+        $baseUploadDir = $_ENV['UPLOAD_DIR'] ?? (__DIR__ . '/../../public/uploads');
+
+        $candidates = [
+            rtrim($baseUploadDir, '/\\') . DIRECTORY_SEPARATOR . 'volunteers' . DIRECTORY_SEPARATOR . $basename,
+            rtrim($baseUploadDir, '/\\') . DIRECTORY_SEPARATOR . $basename,
+            __DIR__ . '/../../public/uploads/volunteers/' . $basename,
+            __DIR__ . '/../../public/uploads/' . $basename,
+            __DIR__ . '/../../uploads/volunteers/' . $basename,
+            __DIR__ . '/../../uploads/' . $basename,
+            dirname(__DIR__, 2) . '/public/uploads/volunteers/' . $basename,
+            dirname(__DIR__, 2) . '/public/uploads/' . $basename,
+        ];
+
+        foreach ($candidates as $cand) {
+            if (file_exists($cand)) return $cand;
+        }
+
+        return null;
+    }
+
+    private function getUploadUrl() {
+        return rtrim($_ENV['UPLOAD_URL'] ?? 'http://localhost:5000/uploads', '/');
+    }
+
+    private function formatFileUrl($path, $volunteerId = null, $type = null) {
+        if (empty($path)) return null;
+        if (preg_match('/^https?:\/\//i', $path)) return $path;
+
+        $clean = ltrim(str_replace('\\', '/', $path), '/');
+        $uploadUrl = $this->getUploadUrl();
+
+        // If path begins with uploads/, remove it so we don't end up with /uploads/uploads/
+        if (str_starts_with($clean, 'uploads/')) {
+            $clean = substr($clean, strlen('uploads/'));
+        }
+
+        return $uploadUrl . '/' . ltrim($clean, '/');
+    }
+
     private function mapVolunteer($row) {
         return [
             'id' => (string)$row['id'],
@@ -211,10 +311,14 @@ class VolunteersController {
             'socialWorkInterest' => $row['social_work_interest'],
             'previousExperience' => $row['previous_experience'],
             'membershipType' => $row['membership_type'],
-            'photoPath' => $row['photo_path'],
-            'aadhaarPath' => $row['aadhaar_path'],
-            'addressProofPath' => $row['address_proof_path'],
-            'otherDocPath' => $row['other_doc_path'],
+            'photoPath' => $this->formatFileUrl($row['photo_path']),
+            'aadhaarPath' => $this->formatFileUrl($row['aadhaar_path']),
+            'addressProofPath' => $this->formatFileUrl($row['address_proof_path']),
+            'otherDocPath' => $this->formatFileUrl($row['other_doc_path']),
+            'photoDownloadUrl' => $row['photo_path'] ? ('/api/volunteers/' . $row['id'] . '/document/photo') : null,
+            'aadhaarDownloadUrl' => $row['aadhaar_path'] ? ('/api/volunteers/' . $row['id'] . '/document/aadhaar') : null,
+            'addressProofDownloadUrl' => $row['address_proof_path'] ? ('/api/volunteers/' . $row['id'] . '/document/address_proof') : null,
+            'otherDocDownloadUrl' => $row['other_doc_path'] ? ('/api/volunteers/' . $row['id'] . '/document/other_doc') : null,
             'status' => $row['status'],
             'createdAt' => $row['created_at'],
         ];

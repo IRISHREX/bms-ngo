@@ -24,3 +24,9 @@ dist-ssr
 *.sw?
 .env
 backend/uploads/
+backend-php/public/uploads/
+backend-php/.env
+scratch_deploy/
+*.sql
+*.zip
+

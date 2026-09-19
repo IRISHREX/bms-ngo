@@ -16,7 +16,7 @@ class BlogController {
     }
 
     private function getUploadUrl() {
-        return $_ENV['UPLOAD_URL'] ?? 'http://localhost:5000/uploads';
+        return rtrim($_ENV['UPLOAD_URL'] ?? 'http://localhost:5000/uploads', '/');
     }
 
     public function getPublic(Request $request, Response $response, $args) {

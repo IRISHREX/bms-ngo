@@ -72,6 +72,23 @@ node c:\PROJECTS\bms-ngo\ssh-deploy\deploy.js --config C:\PROJECTS\my-new-projec
 
 ---
 
+### Step 4 — Fetch / Download from Server (Optional)
+
+```powershell
+# Fetch everything (backend, MySQL DB dump, frontend) into timestamped backup
+node c:\PROJECTS\bms-ngo\ssh-deploy\fetch.js
+
+# Fetch specific target only
+node c:\PROJECTS\bms-ngo\ssh-deploy\fetch.js --only backend
+node c:\PROJECTS\bms-ngo\ssh-deploy\fetch.js --only db
+node c:\PROJECTS\bms-ngo\ssh-deploy\fetch.js --only frontend
+
+# Custom destination folder
+node c:\PROJECTS\bms-ngo\ssh-deploy\fetch.js --out my-backup
+```
+
+---
+
 ## Config reference
 
 ```js

@@ -19,7 +19,7 @@ class GalleryController {
     }
 
     private function getUploadUrl() {
-        return $_ENV['UPLOAD_URL'] ?? 'http://localhost:5000/uploads';
+        return rtrim($_ENV['UPLOAD_URL'] ?? 'http://localhost:5000/uploads', '/');
     }
 
     public function getAll(Request $request, Response $response, $args) {
