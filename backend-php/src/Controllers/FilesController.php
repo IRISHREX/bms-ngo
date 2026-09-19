@@ -15,8 +15,10 @@ class FilesController {
     public function __construct() {
         $database = new Database();
         $this->db = $database->getConnection();
-        // Fallback to local if not set
-        $this->uploadDir = $_ENV['UPLOAD_DIR'] ?? __DIR__ . '/../../public/uploads';
+        // Canonical absolute directory
+        $this->uploadDir = !empty($_ENV['UPLOAD_DIR']) && is_dir($_ENV['UPLOAD_DIR'])
+            ? $_ENV['UPLOAD_DIR']
+            : (realpath(__DIR__ . '/../../public/uploads') ?: (__DIR__ . '/../../public/uploads'));
         
         if (!is_dir($this->uploadDir)) {
             @mkdir($this->uploadDir, 0777, true);
@@ -24,7 +26,7 @@ class FilesController {
     }
 
     private function getUploadUrl() {
-        return $_ENV['UPLOAD_URL'] ?? 'http://localhost:5000/uploads';
+        return rtrim($_ENV['UPLOAD_URL'] ?? 'https://api.hopefoundationmsd.org/uploads', '/');
     }
 
     public function getAll(Request $request, Response $response, $args) {
@@ -94,10 +96,10 @@ class FilesController {
             $uploadedFile->moveTo($targetPath);
 
             $user = $request->getAttribute('user');
-            $uploaderName = $user ? ($user->name ?? 'Unknown') : 'Unknown';
+            $userId = !empty($user) && !empty($user->id) && is_numeric($user->id) ? (int)$user->id : null;
 
             $stmt = $this->db->prepare("INSERT INTO files (name, type, size, folder, uploaded_by, used_in, file_path) VALUES (?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$originalName, $type, $uploadedFile->getSize(), $folder, $uploaderName, $usedIn, $targetPath]);
+            $stmt->execute([$originalName, $type, $uploadedFile->getSize(), $folder, $userId, $usedIn, $targetPath]);
             
             $insertId = $this->db->lastInsertId();
 
@@ -213,6 +215,8 @@ class FilesController {
                 ->withBody($stream)
                 ->withHeader('Content-Type', $mime)
                 ->withHeader('Content-Disposition', 'attachment; filename="' . addslashes($downloadName) . '"')
+                ->withHeader('Access-Control-Allow-Origin', '*')
+                ->withHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
                 ->withHeader('Content-Length', (string)filesize($path));
         } catch (\Exception $e) {
             $response->getBody()->write(json_encode(["error" => $e->getMessage()]));

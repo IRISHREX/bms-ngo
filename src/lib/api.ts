@@ -272,7 +272,7 @@ export async function fetchGallery(): Promise<GalleryItem[]> {
 
 export async function uploadGalleryPhotos(files: File[], category: string, caption: string): Promise<GalleryItem[]> {
   const form = new FormData();
-  files.forEach((f) => form.append("photos", f));
+  files.forEach((f) => form.append("photos[]", f));
   form.append("category", category);
   form.append("caption", caption);
   const res = await fetch(`${BASE_URL}/gallery`, {

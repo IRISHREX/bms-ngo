@@ -52,6 +52,7 @@ class NoticesController {
         $expiryDate = !empty($body['expiryDate']) ? $body['expiryDate'] : null;
         $pinned = !empty($body['pinned']) ? 1 : 0;
         $status = $body['status'] ?? 'draft';
+        $attachmentFileId = !empty($body['attachmentFileId']) ? $body['attachmentFileId'] : (!empty($body['attachment_file_id']) ? $body['attachment_file_id'] : null);
 
         if (!$title) {
             $response->getBody()->write(json_encode(["error" => "Title is required"]));
@@ -59,8 +60,8 @@ class NoticesController {
         }
 
         try {
-            $stmt = $this->db->prepare("INSERT INTO notices (title, description, publish_date, expiry_date, pinned, status) VALUES (?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$title, $description, $publishDate, $expiryDate, $pinned, $status]);
+            $stmt = $this->db->prepare("INSERT INTO notices (title, description, publish_date, expiry_date, pinned, status, attachment_file_id) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$title, $description, $publishDate, $expiryDate, $pinned, $status, $attachmentFileId]);
             
             $insertId = $this->db->lastInsertId();
 
@@ -82,10 +83,11 @@ class NoticesController {
         $expiryDate = !empty($body['expiryDate']) ? $body['expiryDate'] : null;
         $pinned = !empty($body['pinned']) ? 1 : 0;
         $status = $body['status'] ?? 'draft';
+        $attachmentFileId = !empty($body['attachmentFileId']) ? $body['attachmentFileId'] : (!empty($body['attachment_file_id']) ? $body['attachment_file_id'] : null);
 
         try {
-            $stmt = $this->db->prepare("UPDATE notices SET title = ?, description = ?, publish_date = ?, expiry_date = ?, pinned = ?, status = ? WHERE id = ?");
-            $stmt->execute([$title, $description, $publishDate, $expiryDate, $pinned, $status, $id]);
+            $stmt = $this->db->prepare("UPDATE notices SET title = ?, description = ?, publish_date = ?, expiry_date = ?, pinned = ?, status = ?, attachment_file_id = ? WHERE id = ?");
+            $stmt->execute([$title, $description, $publishDate, $expiryDate, $pinned, $status, $attachmentFileId, $id]);
             
             $response->getBody()->write(json_encode(["message" => "Notice updated"]));
             return $response->withHeader('Content-Type', 'application/json')->withStatus(200);

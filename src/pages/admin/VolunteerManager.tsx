@@ -68,9 +68,9 @@ export default function VolunteerManager() {
     updateStatusMutation.mutate({ id, status });
   };
 
-  const downloadVolunteerPdf = (v: Volunteer) => {
+  const downloadVolunteerPdf = async (v: Volunteer) => {
     try {
-      generateVolunteerPdf(v);
+      await generateVolunteerPdf(v);
     } catch (err) {
       console.error("Failed to generate PDF", err);
       toast({ title: "Failed to generate PDF", variant: "destructive" });

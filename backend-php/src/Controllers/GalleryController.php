@@ -15,11 +15,16 @@ class GalleryController {
     public function __construct() {
         $database = new Database();
         $this->db = $database->getConnection();
-        $this->uploadDir = $_ENV['UPLOAD_DIR'] ?? __DIR__ . '/../../public/uploads';
+        $this->uploadDir = !empty($_ENV['UPLOAD_DIR']) && is_dir($_ENV['UPLOAD_DIR'])
+            ? $_ENV['UPLOAD_DIR']
+            : (realpath(__DIR__ . '/../../public/uploads') ?: (__DIR__ . '/../../public/uploads'));
+        if (!is_dir($this->uploadDir)) {
+            @mkdir($this->uploadDir, 0777, true);
+        }
     }
 
     private function getUploadUrl() {
-        return rtrim($_ENV['UPLOAD_URL'] ?? 'http://localhost:5000/uploads', '/');
+        return rtrim($_ENV['UPLOAD_URL'] ?? 'https://api.hopefoundationmsd.org/uploads', '/');
     }
 
     public function getAll(Request $request, Response $response, $args) {
@@ -57,29 +62,34 @@ class GalleryController {
     public function create(Request $request, Response $response, $args) {
         $uploadedFiles = $request->getUploadedFiles();
         
-        if (empty($uploadedFiles['photos']) || !is_array($uploadedFiles['photos'])) {
+        $photos = $uploadedFiles['photos'] ?? $uploadedFiles['photos[]'] ?? $uploadedFiles['photo'] ?? null;
+        if (empty($photos)) {
             $response->getBody()->write(json_encode(["error" => "No photos uploaded"]));
             return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+        }
+
+        if (!is_array($photos)) {
+            $photos = [$photos];
         }
 
         $body = $request->getParsedBody();
         $category = $body['category'] ?? 'events';
         $caption = $body['caption'] ?? '';
         
-        $targetFolder = $this->uploadDir . '/gallery';
+        $targetFolder = rtrim($this->uploadDir, '/\\') . DIRECTORY_SEPARATOR . 'gallery';
         if (!is_dir($targetFolder)) {
             @mkdir($targetFolder, 0777, true);
         }
 
         $results = [];
         $user = $request->getAttribute('user');
-        $uploaderName = $user ? ($user->name ?? 'Unknown') : 'Unknown';
+        $userId = !empty($user) && !empty($user->id) && is_numeric($user->id) ? (int)$user->id : null;
 
         try {
             $this->db->beginTransaction();
 
-            foreach ($uploadedFiles['photos'] as $uploadedFile) {
-                if ($uploadedFile->getError() === UPLOAD_ERR_OK) {
+            foreach ($photos as $uploadedFile) {
+                if ($uploadedFile && $uploadedFile->getError() === UPLOAD_ERR_OK) {
                     $originalName = $uploadedFile->getClientFilename();
                     $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
                     $type = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp']) ? 'image' : $ext;
@@ -90,7 +100,7 @@ class GalleryController {
                     $uploadedFile->moveTo($targetPath);
 
                     $stmt = $this->db->prepare("INSERT INTO files (name, type, size, folder, uploaded_by, used_in, file_path) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                    $stmt->execute([$originalName, $type, $uploadedFile->getSize(), 'gallery', $uploaderName, 'Gallery', $targetPath]);
+                    $stmt->execute([$originalName, $type, $uploadedFile->getSize(), 'gallery', $userId, 'Gallery', $targetPath]);
                     $fileId = $this->db->lastInsertId();
 
                     $galStmt = $this->db->prepare("INSERT INTO gallery (caption, category, file_id) VALUES (?, ?, ?)");

@@ -40,7 +40,9 @@ class VolunteersController {
         }
 
         // Handle file uploads
-        $baseUploadDir = $_ENV['UPLOAD_DIR'] ?? (__DIR__ . '/../../public/uploads');
+        $baseUploadDir = !empty($_ENV['UPLOAD_DIR']) && is_dir($_ENV['UPLOAD_DIR'])
+            ? $_ENV['UPLOAD_DIR']
+            : (realpath(__DIR__ . '/../../public/uploads') ?: (__DIR__ . '/../../public/uploads'));
         if (!is_dir($baseUploadDir)) {
             @mkdir($baseUploadDir, 0777, true);
         }
@@ -233,6 +235,8 @@ class VolunteersController {
                 ->withBody($stream)
                 ->withHeader('Content-Type', $mime)
                 ->withHeader('Content-Disposition', 'attachment; filename="' . $downloadFilename . '"')
+                ->withHeader('Access-Control-Allow-Origin', '*')
+                ->withHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
                 ->withHeader('Content-Length', (string)filesize($filePath));
         } catch (\Exception $e) {
             $response->getBody()->write(json_encode(["error" => $e->getMessage()]));
