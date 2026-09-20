@@ -1,5 +1,5 @@
 // API Service Layer — wired to Express backend
-import { authHeaders, authHeadersMultipart } from "./auth";
+import { authHeaders, authHeadersMultipart, getToken } from "./auth";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "/api";
 
@@ -68,6 +68,13 @@ export interface GalleryItem {
   caption: string;
   category: "events" | "beneficiaries" | "volunteers" | "field-visits";
   uploadedAt: string;
+}
+
+export interface HeroSlide {
+  id: string;
+  imageUrl: string;
+  sortOrder: number;
+  createdAt: string;
 }
 
 export interface Notice {
@@ -214,6 +221,55 @@ async function del<T>(url: string): Promise<T> {
   return res.json();
 }
 
+export function uploadWithProgress<T>(
+  url: string,
+  formData: FormData,
+  onProgress?: (percent: number) => void
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${BASE_URL}${url}`);
+
+    const token = getToken();
+    if (token) {
+      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    }
+
+    if (xhr.upload && onProgress) {
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percent = (event.loaded / event.total) * 100;
+          onProgress(percent);
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const json = JSON.parse(xhr.responseText);
+          resolve(json);
+        } catch {
+          resolve({} as T);
+        }
+      } else {
+        try {
+          const err = JSON.parse(xhr.responseText);
+          reject(new Error(err.error || `Upload failed with status ${xhr.status}`));
+        } catch {
+          reject(new Error(`Upload failed with status ${xhr.status}`));
+        }
+      }
+    };
+
+    xhr.onerror = () => {
+      reject(new Error("Network error during file upload"));
+    };
+
+    xhr.send(formData);
+  });
+}
+
 // ============ DASHBOARD ============
 
 export async function fetchDashboardStats(): Promise<DashboardStats> {
@@ -246,18 +302,17 @@ export async function fetchFiles(): Promise<FileItem[]> {
   return get<FileItem[]>("/files", true);
 }
 
-export async function uploadFile(file: File, folder: string, usedIn: string): Promise<FileItem> {
+export async function uploadFile(
+  file: File,
+  folder: string,
+  usedIn: string,
+  onProgress?: (pct: number) => void
+): Promise<FileItem> {
   const form = new FormData();
   form.append("file", file);
   form.append("folder", folder);
   form.append("usedIn", usedIn);
-  const res = await fetch(`${BASE_URL}/files/upload`, {
-    method: "POST",
-    headers: authHeadersMultipart(),
-    body: form,
-  });
-  if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
-  return res.json();
+  return uploadWithProgress<FileItem>("/files/upload", form, onProgress);
 }
 
 export async function deleteFile(id: string) {
@@ -270,18 +325,17 @@ export async function fetchGallery(): Promise<GalleryItem[]> {
   return get<GalleryItem[]>("/gallery");
 }
 
-export async function uploadGalleryPhotos(files: File[], category: string, caption: string): Promise<GalleryItem[]> {
+export async function uploadGalleryPhotos(
+  files: File[],
+  category: string,
+  caption: string,
+  onProgress?: (pct: number) => void
+): Promise<GalleryItem[]> {
   const form = new FormData();
   files.forEach((f) => form.append("photos[]", f));
   form.append("category", category);
   form.append("caption", caption);
-  const res = await fetch(`${BASE_URL}/gallery`, {
-    method: "POST",
-    headers: authHeadersMultipart(),
-    body: form,
-  });
-  if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
-  return res.json();
+  return uploadWithProgress<GalleryItem[]>("/gallery", form, onProgress);
 }
 
 export async function updateGalleryItem(id: string, data: { caption: string; category: string }) {
@@ -446,6 +500,22 @@ export async function fetchThemeState(): Promise<ThemeState> {
 
 export async function updateTheme(themeKey: string) {
   return put("/theme", { themeKey });
+}
+
+// ============ HERO SLIDES ============
+
+export async function fetchHeroSlides(): Promise<HeroSlide[]> {
+  return get<HeroSlide[]>("/hero-slides");
+}
+
+export async function uploadHeroSlide(file: File, onProgress?: (pct: number) => void): Promise<HeroSlide> {
+  const form = new FormData();
+  form.append("slide", file);
+  return uploadWithProgress<HeroSlide>("/hero-slides", form, onProgress);
+}
+
+export async function deleteHeroSlide(id: string): Promise<{ success: boolean; message: string }> {
+  return del(`/hero-slides/${id}`);
 }
 
 // ============ HELPERS ============

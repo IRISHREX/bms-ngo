@@ -1,10 +1,10 @@
-﻿import { Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { fetchDashboardStats, fetchProjects, fetchBlogPosts, fetchNotices, formatDate } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { GraduationCap, UtensilsCrossed, MapPin, Users, Heart, ArrowRight, Pin } from "lucide-react";
-import heroImage from "@/assets/hero-image.jpg";
+import { HeroCarousel } from "@/components/HeroCarousel";
 import CoverInitialsTile from "@/components/CoverInitialsTile";
 import { useI18n } from "@/lib/i18n";
 
@@ -29,10 +29,7 @@ export default function HomePage() {
   return (
     <div>
       <section className="relative min-h-[85vh] flex items-center overflow-hidden">
-        <div className="absolute inset-0">
-          <img src={heroImage} alt="Rural children studying in an open-air classroom" className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-r from-foreground/90 via-foreground/70 to-foreground/30" />
-        </div>
+        <HeroCarousel />
         <div className="container mx-auto px-4 relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 30 }}

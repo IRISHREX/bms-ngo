@@ -31,3 +31,5 @@ backend-php/.env
 scratch_deploy/
 *.sql
 *.zip
+ssh-deploy/scratch*
+ssh-deploy/download*

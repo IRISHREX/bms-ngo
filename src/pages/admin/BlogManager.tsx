@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FileUploadWithPreview } from "@/components/ui/FileUploadWithPreview";
+import { WordCounter } from "@/components/ui/WordCounter";
 import { toast } from "@/hooks/use-toast";
 
 const emptyPost: Partial<BlogPost> = { title: "", content: "", status: "draft", tags: [] };
@@ -22,7 +24,8 @@ export default function BlogManager() {
   const [editing, setEditing] = useState<Partial<BlogPost>>(emptyPost);
   const [deleteTarget, setDeleteTarget] = useState<BlogPost | null>(null);
   const [tagInput, setTagInput] = useState("");
-  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverFiles, setCoverFiles] = useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   const invalidateBlog = async () => {
     await queryClient.invalidateQueries({ queryKey: ["admin-blog-posts"] });
@@ -30,13 +33,18 @@ export default function BlogManager() {
   };
 
   const createMutation = useMutation({
-    mutationFn: createBlogPost,
+    mutationFn: (data: Partial<BlogPost>) => createBlogPost(data),
     onSuccess: async () => {
       await invalidateBlog();
-      toast({ title: "Post created", description: `"${editing.title}" saved.` });
+      toast({ title: "Post created", description: "Your post has been drafted or published." });
       setDialogOpen(false);
+      setCoverFiles([]);
+      setUploadProgress(null);
     },
-    onError: (error: Error) => toast({ title: "Create failed", description: error.message, variant: "destructive" }),
+    onError: (error: Error) => {
+      setUploadProgress(null);
+      toast({ title: "Create failed", description: error.message, variant: "destructive" });
+    },
   });
 
   const updateMutation = useMutation({
@@ -45,8 +53,13 @@ export default function BlogManager() {
       await invalidateBlog();
       toast({ title: "Post updated", description: `"${editing.title}" saved.` });
       setDialogOpen(false);
+      setCoverFiles([]);
+      setUploadProgress(null);
     },
-    onError: (error: Error) => toast({ title: "Update failed", description: error.message, variant: "destructive" }),
+    onError: (error: Error) => {
+      setUploadProgress(null);
+      toast({ title: "Update failed", description: error.message, variant: "destructive" });
+    },
   });
 
   const deleteMutation = useMutation({
@@ -62,14 +75,16 @@ export default function BlogManager() {
   const openCreate = () => {
     setEditing({ ...emptyPost });
     setTagInput("");
-    setCoverFile(null);
+    setCoverFiles([]);
+    setUploadProgress(null);
     setDialogOpen(true);
   };
 
   const openEdit = (p: BlogPost) => {
     setEditing({ ...p });
     setTagInput((p.tags || []).join(", "));
-    setCoverFile(null);
+    setCoverFiles([]);
+    setUploadProgress(null);
     setDialogOpen(true);
   };
 
@@ -79,24 +94,34 @@ export default function BlogManager() {
   };
 
   const handleSave = async () => {
-    if (!editing.title?.trim() || !editing.content?.trim()) {
+    const title = (editing.title || "").trim();
+    const content = (editing.content || "").trim();
+
+    if (!title || !content) {
       toast({ title: "Missing fields", description: "Title and content are required.", variant: "destructive" });
+      return;
+    }
+
+    const titleWords = title.split(/\s+/).filter(Boolean).length;
+    if (titleWords > 30) {
+      toast({ title: "Title too long", description: "Title cannot exceed 30 words.", variant: "destructive" });
       return;
     }
 
     const tags = tagInput.split(",").map((t) => t.trim()).filter(Boolean);
     const payload: Partial<BlogPost> = {
-      title: editing.title.trim(),
-      content: editing.content.trim(),
+      title,
+      content,
       status: editing.status || "draft",
       tags,
     };
 
-    if (coverFile) {
+    if (coverFiles.length > 0) {
       try {
-        const uploaded = await uploadFile(coverFile, "blog", "Blog");
+        const uploaded = await uploadFile(coverFiles[0], "blog", "Blog", (pct) => setUploadProgress(pct));
         payload.coverImage = uploaded.id;
       } catch (error) {
+        setUploadProgress(null);
         const message = error instanceof Error ? error.message : "Cover upload failed";
         toast({ title: "Cover upload failed", description: message, variant: "destructive" });
         return;
@@ -122,7 +147,7 @@ export default function BlogManager() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="page-header">Blog Manager</h1>
-          <p className="page-description">{posts.length} posts · {posts.filter((p) => p.status === "published").length} published</p>
+          <p className="page-description">{posts.length} posts Â· {posts.filter((p) => p.status === "published").length} published</p>
         </div>
         <Button className="gap-2" onClick={openCreate}><Plus className="w-4 h-4" /> New Post</Button>
       </div>
@@ -165,8 +190,29 @@ export default function BlogManager() {
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>{editing.id ? "Edit Post" : "New Post"}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="space-y-2"><Label>Title</Label><Input value={editing.title ?? ""} onChange={(e) => setEditing({ ...editing, title: e.target.value })} placeholder="Post title" /></div>
-            <div className="space-y-2"><Label>Content</Label><Textarea value={editing.content ?? ""} onChange={(e) => setEditing({ ...editing, content: e.target.value })} placeholder="Write your blog post..." rows={6} /></div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Title</Label>
+                <WordCounter text={editing.title ?? ""} maxWords={30} />
+              </div>
+              <Input
+                value={editing.title ?? ""}
+                onChange={(e) => setEditing({ ...editing, title: e.target.value })}
+                placeholder="Post title (max 30 words)"
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Content</Label>
+                <WordCounter text={editing.content ?? ""} maxWords={2000} showChars />
+              </div>
+              <Textarea
+                value={editing.content ?? ""}
+                onChange={(e) => setEditing({ ...editing, content: e.target.value })}
+                placeholder="Write your blog post..."
+                rows={6}
+              />
+            </div>
             <div className="space-y-2">
               <Label>Status</Label>
               <Select value={editing.status ?? "draft"} onValueChange={(v) => setEditing({ ...editing, status: v as BlogPost["status"] })}>
@@ -177,9 +223,22 @@ export default function BlogManager() {
             <div className="space-y-2">
               <Label>Cover Image</Label>
               {editing.coverImage && (
-                <img src={editing.coverImage} alt="Current cover" className="w-full h-32 object-cover rounded-md border border-border" />
+                <div className="mb-2">
+                  <p className="text-xs text-muted-foreground mb-1">Current Cover:</p>
+                  <img src={editing.coverImage} alt="Current cover" className="w-full h-32 object-cover rounded-md border border-border" />
+                </div>
               )}
-              <Input type="file" accept="image/*" onChange={(e) => setCoverFile(e.target.files?.[0] || null)} />
+              <FileUploadWithPreview
+                files={coverFiles}
+                onFilesChange={setCoverFiles}
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                allowedExtensions={["jpg", "jpeg", "png", "webp", "gif"]}
+                maxSizeMB={5}
+                multiple={false}
+                progress={uploadProgress}
+                isUploading={busy}
+                dropzoneText="Click or drop a cover image (Max 5 MB)"
+              />
             </div>
             <div className="space-y-2"><Label>Tags (comma-separated)</Label><Input value={tagInput} onChange={(e) => setTagInput(e.target.value)} placeholder="education, impact, report" /></div>
           </div>

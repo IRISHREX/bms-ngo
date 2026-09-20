@@ -16,6 +16,7 @@ use App\Controllers\DonationsController;
 use App\Controllers\FilesController;
 use App\Controllers\GalleryController;
 use App\Controllers\ThemeController;
+use App\Controllers\HeroSlidesController;
 
 return function (App $app) {
     
@@ -54,6 +55,9 @@ return function (App $app) {
 
         // Gallery (Public read)
         $group->get('/gallery', [GalleryController::class, 'getAll']);
+
+        // Hero Slides (Public read)
+        $group->get('/hero-slides', [HeroSlidesController::class, 'getAll']);
 
         // Theme (Public read)
         $group->get('/theme', [ThemeController::class, 'getTheme']);
@@ -126,6 +130,12 @@ return function (App $app) {
                 $galleryGroup->post('', [GalleryController::class, 'create']);
                 $galleryGroup->put('/{id}', [GalleryController::class, 'update']);
                 $galleryGroup->delete('/{id}', [GalleryController::class, 'delete']);
+            });
+
+            // Hero Slides (Admin)
+            $protected->group('/hero-slides', function (RouteCollectorProxy $heroGroup) {
+                $heroGroup->post('', [HeroSlidesController::class, 'create']);
+                $heroGroup->delete('/{id}', [HeroSlidesController::class, 'delete']);
             });
 
             // Theme (Admin)

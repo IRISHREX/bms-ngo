@@ -107,6 +107,19 @@ export default function VolunteerPage() {
       return;
     }
 
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    const allowedDocs = ['jpg', 'jpeg', 'png', 'pdf'];
+    if (!allowedDocs.includes(ext)) {
+      toast({
+        title: "Invalid file format",
+        description: `"${file.name}": Format not allowed. Please select a JPG, PNG, or PDF document.`,
+        variant: "destructive"
+      });
+      e.target.value = "";
+      setFileDetails((prev) => ({ ...prev, [key]: undefined }));
+      return;
+    }
+
     if (file.size > MAX_FILE_SIZE) {
       toast({
         title: "File size exceeds 5 MB limit",

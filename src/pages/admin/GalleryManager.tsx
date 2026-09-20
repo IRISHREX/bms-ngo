@@ -9,6 +9,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FileUploadWithPreview } from "@/components/ui/FileUploadWithPreview";
+import { WordCounter } from "@/components/ui/WordCounter";
 import { toast } from "@/hooks/use-toast";
 
 const categories = [
@@ -33,18 +35,24 @@ export default function GalleryManager() {
   const [editing, setEditing] = useState<Partial<GalleryItem>>(emptyItem);
   const [deleteTarget, setDeleteTarget] = useState<GalleryItem | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   const filtered = activeCategory === "all" ? galleryItems : galleryItems.filter((g) => g.category === activeCategory);
 
   const uploadMutation = useMutation({
-    mutationFn: ({ files, category, caption }: { files: File[]; category: string; caption: string }) => uploadGalleryPhotos(files, category, caption),
+    mutationFn: ({ files, category, caption }: { files: File[]; category: string; caption: string }) =>
+      uploadGalleryPhotos(files, category, caption, (pct) => setUploadProgress(pct)),
     onSuccess: async (_, vars) => {
       await queryClient.invalidateQueries({ queryKey: ["gallery"] });
       toast({ title: "Photos uploaded", description: `${vars.files.length} photo(s) uploaded.` });
       setDialogOpen(false);
       setSelectedFiles([]);
+      setUploadProgress(null);
     },
-    onError: (error: Error) => toast({ title: "Upload failed", description: error.message, variant: "destructive" }),
+    onError: (error: Error) => {
+      setUploadProgress(null);
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    },
   });
 
   const updateMutation = useMutation({
@@ -70,12 +78,14 @@ export default function GalleryManager() {
   const openCreate = () => {
     setEditing({ ...emptyItem });
     setSelectedFiles([]);
+    setUploadProgress(null);
     setDialogOpen(true);
   };
 
   const openEdit = (item: GalleryItem) => {
     setEditing({ ...item });
     setSelectedFiles([]);
+    setUploadProgress(null);
     setDialogOpen(true);
   };
 
@@ -87,6 +97,13 @@ export default function GalleryManager() {
   const handleSave = () => {
     const caption = (editing.caption || "").trim();
     const category = editing.category || "events";
+
+    // Word count validation: max 50 words
+    const captionWords = caption ? caption.split(/\s+/).filter(Boolean).length : 0;
+    if (captionWords > 50) {
+      toast({ title: "Caption too long", description: "Caption cannot exceed 50 words.", variant: "destructive" });
+      return;
+    }
 
     if (editing.id) {
       updateMutation.mutate({ id: editing.id, caption, category });
@@ -159,9 +176,32 @@ export default function GalleryManager() {
           <DialogHeader><DialogTitle>{editing.id ? "Edit Photo" : "Upload Photo"}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             {!editing.id && (
-              <div className="space-y-2"><Label>Photo(s)</Label><Input type="file" accept="image/*" multiple onChange={(e) => setSelectedFiles(Array.from(e.target.files || []))} /></div>
+              <div className="space-y-2">
+                <Label>Photo(s)</Label>
+                <FileUploadWithPreview
+                  files={selectedFiles}
+                  onFilesChange={setSelectedFiles}
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  allowedExtensions={["jpg", "jpeg", "png", "webp", "gif"]}
+                  maxSizeMB={5}
+                  multiple={true}
+                  maxFiles={10}
+                  progress={uploadProgress}
+                  isUploading={uploadMutation.isPending}
+                />
+              </div>
             )}
-            <div className="space-y-2"><Label>Caption</Label><Input value={editing.caption ?? ""} onChange={(e) => setEditing({ ...editing, caption: e.target.value })} placeholder="Photo caption" /></div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Caption</Label>
+                <WordCounter text={editing.caption ?? ""} maxWords={50} />
+              </div>
+              <Input
+                value={editing.caption ?? ""}
+                onChange={(e) => setEditing({ ...editing, caption: e.target.value })}
+                placeholder="Photo caption (max 50 words)"
+              />
+            </div>
             <div className="space-y-2">
               <Label>Category</Label>
               <Select value={editing.category ?? "events"} onValueChange={(v) => setEditing({ ...editing, category: v as GalleryItem["category"] })}>

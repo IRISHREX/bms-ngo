@@ -1,16 +1,17 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createProject, deleteProject, fetchProjects, formatCurrency, updateProject, type Project } from "@/lib/api";
-import { Plus, Edit, MapPin, Trash2 } from "lucide-react";
+import { Plus, Edit, Trash2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { WordCounter } from "@/components/ui/WordCounter";
 import { toast } from "@/hooks/use-toast";
 
 const emptyProject: Partial<Project> = { title: "", description: "", location: "", budget: 0, fundsUsed: 0, status: "planned" };
@@ -24,10 +25,10 @@ export default function ProjectsManager() {
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
 
   const createMutation = useMutation({
-    mutationFn: createProject,
+    mutationFn: (data: Partial<Project>) => createProject(data),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["projects"] });
-      toast({ title: "Project created", description: `"${editing.title}" saved.` });
+      toast({ title: "Project created", description: "The project has been added." });
       setDialogOpen(false);
     },
     onError: (error: Error) => toast({ title: "Create failed", description: error.message, variant: "destructive" }),
@@ -69,15 +70,31 @@ export default function ProjectsManager() {
   };
 
   const handleSave = () => {
-    if (!editing.title?.trim() || !editing.location?.trim()) {
+    const title = (editing.title || "").trim();
+    const location = (editing.location || "").trim();
+    const description = (editing.description || "").trim();
+
+    if (!title || !location) {
       toast({ title: "Missing fields", description: "Title and location are required.", variant: "destructive" });
       return;
     }
 
+    const titleWords = title.split(/\s+/).filter(Boolean).length;
+    if (titleWords > 30) {
+      toast({ title: "Title too long", description: "Title cannot exceed 30 words.", variant: "destructive" });
+      return;
+    }
+
+    const descWords = description ? description.split(/\s+/).filter(Boolean).length : 0;
+    if (descWords > 300) {
+      toast({ title: "Description too long", description: "Description cannot exceed 300 words.", variant: "destructive" });
+      return;
+    }
+
     const payload: Partial<Project> = {
-      title: editing.title.trim(),
-      description: (editing.description || "").trim(),
-      location: editing.location.trim(),
+      title,
+      description,
+      location,
       budget: Number(editing.budget || 0),
       fundsUsed: Number(editing.fundsUsed || 0),
       status: editing.status || "planned",
@@ -102,7 +119,7 @@ export default function ProjectsManager() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="page-header">Projects</h1>
-          <p className="page-description">{projects.length} projects · {projects.filter((p) => p.status === "ongoing").length} ongoing</p>
+          <p className="page-description">{projects.length} projects Â· {projects.filter((p) => p.status === "ongoing").length} ongoing</p>
         </div>
         <Button className="gap-2" onClick={openCreate}><Plus className="w-4 h-4" /> New Project</Button>
       </div>
@@ -141,8 +158,29 @@ export default function ProjectsManager() {
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>{editing.id ? "Edit Project" : "New Project"}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="space-y-2"><Label>Title</Label><Input value={editing.title ?? ""} onChange={(e) => setEditing({ ...editing, title: e.target.value })} placeholder="Project name" /></div>
-            <div className="space-y-2"><Label>Description</Label><Textarea value={editing.description ?? ""} onChange={(e) => setEditing({ ...editing, description: e.target.value })} rows={3} /></div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Title</Label>
+                <WordCounter text={editing.title ?? ""} maxWords={30} />
+              </div>
+              <Input
+                value={editing.title ?? ""}
+                onChange={(e) => setEditing({ ...editing, title: e.target.value })}
+                placeholder="Project name (max 30 words)"
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Description</Label>
+                <WordCounter text={editing.description ?? ""} maxWords={300} />
+              </div>
+              <Textarea
+                value={editing.description ?? ""}
+                onChange={(e) => setEditing({ ...editing, description: e.target.value })}
+                placeholder="Project description (max 300 words)..."
+                rows={3}
+              />
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2"><Label>Location</Label><Input value={editing.location ?? ""} onChange={(e) => setEditing({ ...editing, location: e.target.value })} placeholder="e.g. West Bengal" /></div>
               <div className="space-y-2">

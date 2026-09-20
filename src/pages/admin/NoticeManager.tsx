@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { WordCounter } from "@/components/ui/WordCounter";
 import { toast } from "@/hooks/use-toast";
 
 const emptyNotice: Partial<Notice> = {
@@ -86,6 +87,18 @@ export default function NoticeManager() {
       return;
     }
 
+    const titleWords = editing.title.trim().split(/\s+/).filter(Boolean).length;
+    if (titleWords > 30) {
+      toast({ title: "Title too long", description: "Title cannot exceed 30 words.", variant: "destructive" });
+      return;
+    }
+
+    const descWords = editing.description.trim().split(/\s+/).filter(Boolean).length;
+    if (descWords > 200) {
+      toast({ title: "Description too long", description: "Description cannot exceed 200 words.", variant: "destructive" });
+      return;
+    }
+
     const payload: Partial<Notice> = {
       title: editing.title.trim(),
       description: editing.description.trim(),
@@ -149,8 +162,29 @@ export default function NoticeManager() {
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>{editing.id ? "Edit Notice" : "New Notice"}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="space-y-2"><Label>Title</Label><Input value={editing.title ?? ""} onChange={(e) => setEditing({ ...editing, title: e.target.value })} placeholder="Notice title" /></div>
-            <div className="space-y-2"><Label>Description</Label><Textarea value={editing.description ?? ""} onChange={(e) => setEditing({ ...editing, description: e.target.value })} placeholder="Describe the notice..." rows={3} /></div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Title</Label>
+                <WordCounter text={editing.title ?? ""} maxWords={30} />
+              </div>
+              <Input
+                value={editing.title ?? ""}
+                onChange={(e) => setEditing({ ...editing, title: e.target.value })}
+                placeholder="Notice title (max 30 words)"
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Description</Label>
+                <WordCounter text={editing.description ?? ""} maxWords={200} />
+              </div>
+              <Textarea
+                value={editing.description ?? ""}
+                onChange={(e) => setEditing({ ...editing, description: e.target.value })}
+                placeholder="Describe the notice (max 200 words)..."
+                rows={3}
+              />
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2"><Label>Publish Date</Label><Input type="date" value={editing.publishDate ?? ""} onChange={(e) => setEditing({ ...editing, publishDate: e.target.value })} /></div>
               <div className="space-y-2"><Label>Expiry Date</Label><Input type="date" value={editing.expiryDate ?? ""} onChange={(e) => setEditing({ ...editing, expiryDate: e.target.value })} /></div>

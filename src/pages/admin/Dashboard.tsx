@@ -25,6 +25,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { useI18n } from "@/lib/i18n";
+import { HeroCarouselManager } from "@/components/HeroCarouselManager";
 
 interface StatCardProps {
   title: string;
@@ -200,6 +201,9 @@ export default function Dashboard() {
           })}
         </div>
       </div>
+
+      {/* Hero Carousel Manager */}
+      <HeroCarouselManager />
 
       <div className="admin-card">
         <div className="flex items-center justify-between mb-4 gap-3">

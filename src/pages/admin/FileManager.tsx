@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FileUploadWithPreview } from "@/components/ui/FileUploadWithPreview";
 import { toast } from "@/hooks/use-toast";
 
 const folderIcons: Record<string, React.ElementType> = { gallery: Image, reports: FileText, certificates: FileText, notices: FileText, blog: FileText, videos: Film };
@@ -25,6 +26,7 @@ export default function FileManager() {
   const [uploadFolder, setUploadFolder] = useState("gallery");
   const [usedIn, setUsedIn] = useState("Gallery");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   const resolveFileUrl = (f: FileItem) => {
     if (f.url && (f.url.startsWith("http://") || f.url.startsWith("https://"))) {
@@ -69,15 +71,27 @@ export default function FileManager() {
 
   const uploadMutation = useMutation({
     mutationFn: async ({ filesToUpload, folder, section }: { filesToUpload: File[]; folder: string; section: string }) => {
-      await Promise.all(filesToUpload.map((file) => uploadFile(file, folder, section)));
+      const total = filesToUpload.length;
+      let completed = 0;
+      for (const file of filesToUpload) {
+        await uploadFile(file, folder, section, (pct) => {
+          const overall = ((completed + pct / 100) / total) * 100;
+          setUploadProgress(overall);
+        });
+        completed++;
+      }
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["files"] });
       toast({ title: "Upload complete", description: `${selectedFiles.length} file(s) uploaded to /${uploadFolder}` });
       setUploadOpen(false);
       setSelectedFiles([]);
+      setUploadProgress(null);
     },
-    onError: (error: Error) => toast({ title: "Upload failed", description: error.message, variant: "destructive" }),
+    onError: (error: Error) => {
+      setUploadProgress(null);
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    },
   });
 
   const deleteMutation = useMutation({
@@ -230,7 +244,18 @@ export default function FileManager() {
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label>Files</Label>
-              <Input type="file" multiple onChange={(e) => setSelectedFiles(Array.from(e.target.files || []))} />
+              <FileUploadWithPreview
+                files={selectedFiles}
+                onFilesChange={setSelectedFiles}
+                accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
+                allowedExtensions={["jpg", "jpeg", "png", "webp", "gif", "pdf", "doc", "docx", "xls", "xlsx"]}
+                maxSizeMB={10}
+                multiple={true}
+                maxFiles={10}
+                progress={uploadProgress}
+                isUploading={uploadMutation.isPending}
+                dropzoneText="Click or drop images or documents here"
+              />
             </div>
             <div className="space-y-2">
               <Label>Destination Folder</Label>
