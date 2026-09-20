@@ -2,10 +2,18 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { fetchHeroSlides } from "@/lib/api";
+import { fetchHeroSlides, HeroSlide } from "@/lib/api";
 import heroImage from "@/assets/hero-image.jpg";
 
-export function HeroCarousel() {
+export interface HeroCarouselProps {
+  children?: (props: {
+    activeSlide: HeroSlide | null;
+    currentIndex: number;
+    totalSlides: number;
+  }) => React.ReactNode;
+}
+
+export function HeroCarousel({ children }: HeroCarouselProps) {
   const { data: slides = [] } = useQuery({
     queryKey: ["hero-slides"],
     queryFn: fetchHeroSlides,
@@ -22,13 +30,13 @@ export function HeroCarousel() {
     }
   }, [slides, currentIndex]);
 
-  // Auto-advance every 5 seconds if more than 1 slide
+  // Auto-advance every 6 seconds if more than 1 slide (plenty of time to read animated text)
   useEffect(() => {
     if (slides.length <= 1 || isPaused) return;
 
     const timer = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % slides.length);
-    }, 5000);
+    }, 6000);
 
     return () => clearInterval(timer);
   }, [slides.length, isPaused]);
@@ -46,13 +54,20 @@ export function HeroCarousel() {
   // If no custom slides, display the default hero image
   if (slides.length === 0) {
     return (
-      <div className="absolute inset-0 overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden select-none">
         <img
           src={heroImage}
           alt="Rural children studying in an open-air classroom"
           className="w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-foreground/90 via-foreground/70 to-foreground/30" />
+        <div className="absolute inset-0 bg-gradient-to-r from-foreground/90 via-foreground/70 to-foreground/30 z-10 pointer-events-none" />
+        {children && (
+          <div className="absolute inset-0 z-10 flex items-center pointer-events-none">
+            <div className="container mx-auto px-4 pointer-events-auto">
+              {children({ activeSlide: null, currentIndex: 0, totalSlides: 0 })}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -88,7 +103,20 @@ export function HeroCarousel() {
       </AnimatePresence>
 
       {/* Dark gradient overlay for text legibility */}
-      <div className="absolute inset-0 bg-gradient-to-r from-foreground/90 via-foreground/70 to-foreground/30 z-10" />
+      <div className="absolute inset-0 bg-gradient-to-r from-foreground/90 via-foreground/70 to-foreground/30 z-10 pointer-events-none" />
+
+      {/* Foreground Content (Text & CTAs) */}
+      {children && (
+        <div className="absolute inset-0 z-10 flex items-center pointer-events-none">
+          <div className="container mx-auto px-4 pointer-events-auto">
+            {children({
+              activeSlide,
+              currentIndex,
+              totalSlides: slides.length,
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Navigation arrows if multiple slides */}
       {slides.length > 1 && (

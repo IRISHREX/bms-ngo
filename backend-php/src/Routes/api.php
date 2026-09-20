@@ -135,6 +135,7 @@ return function (App $app) {
             // Hero Slides (Admin)
             $protected->group('/hero-slides', function (RouteCollectorProxy $heroGroup) {
                 $heroGroup->post('', [HeroSlidesController::class, 'create']);
+                $heroGroup->put('/{id}', [HeroSlidesController::class, 'update']);
                 $heroGroup->delete('/{id}', [HeroSlidesController::class, 'delete']);
             });
 

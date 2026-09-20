@@ -1,10 +1,11 @@
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { fetchDashboardStats, fetchProjects, fetchBlogPosts, fetchNotices, formatDate } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { GraduationCap, UtensilsCrossed, MapPin, Users, Heart, ArrowRight, Pin } from "lucide-react";
 import { HeroCarousel } from "@/components/HeroCarousel";
+import { AnimatedLetters } from "@/components/AnimatedLetters";
 import CoverInitialsTile from "@/components/CoverInitialsTile";
 import { useI18n } from "@/lib/i18n";
 
@@ -29,38 +30,71 @@ export default function HomePage() {
   return (
     <div>
       <section className="relative min-h-[85vh] flex items-center overflow-hidden">
-        <HeroCarousel />
-        <div className="container mx-auto px-4 relative z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="max-w-2xl space-y-6"
-          >
-            <span className="inline-block px-3 py-1 rounded-full text-xs font-medium bg-primary/20 text-primary border border-primary/30">
-              {t("home.hero.badge")}
-            </span>
-            <h1 className="text-4xl md:text-6xl font-bold text-background leading-tight">{t("home.hero.title")}</h1>
-            <p className="text-lg text-background/80 max-w-xl leading-relaxed">{t("home.hero.desc")}</p>
-            <div className="flex flex-wrap gap-3 pt-2">
-              <Link to="/donate">
-                <Button size="lg" className="gap-2 text-base px-8">
-                  <Heart className="w-5 h-5" /> {t("cta.donateNow")}
-                </Button>
-              </Link>
-              <Link to="/volunteer">
-                <Button size="lg" variant="outline" className="gap-2 text-base px-8 border-background/30  hover:bg-background/10">
-                  {t("home.hero.volunteer")}
-                </Button>
-              </Link>
-              <Link to="/impact">
-                <Button size="lg" variant="ghost" className="gap-2 text-base text-background/80 hover:text-background hover:bg-background/10">
-                  {t("home.hero.work")} <ArrowRight className="w-4 h-4" />
-                </Button>
-              </Link>
-            </div>
-          </motion.div>
-        </div>
+        <HeroCarousel>
+          {({ activeSlide }) => {
+            const currentBadge = activeSlide?.badge || t("home.hero.badge");
+            const currentTitle = activeSlide?.title || t("home.hero.title");
+            const currentDesc = activeSlide?.subtitle || t("home.hero.desc");
+            const slideKey = activeSlide?.id || "default";
+
+            return (
+              <div className="max-w-2xl space-y-6">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={slideKey}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.25 }}
+                    className="space-y-4"
+                  >
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <span className="inline-block px-3 py-1 rounded-full text-xs font-medium bg-primary/25 text-primary border border-primary/40 backdrop-blur-md shadow-sm">
+                        {currentBadge}
+                      </span>
+                    </motion.div>
+
+                    <h1 className="text-4xl md:text-6xl font-bold text-background leading-tight">
+                      <AnimatedLetters text={currentTitle} />
+                    </h1>
+
+                    <motion.p
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.45, delay: 0.2 }}
+                      className="text-lg text-background/85 max-w-xl leading-relaxed"
+                    >
+                      {currentDesc}
+                    </motion.p>
+                  </motion.div>
+                </AnimatePresence>
+
+                {/* Always-accessible Action Buttons */}
+                <div className="flex flex-wrap gap-3 pt-2">
+                  <Link to="/donate">
+                    <Button size="lg" className="gap-2 text-base px-8 shadow-lg shadow-primary/25 hover:scale-[1.02] transition-transform">
+                      <Heart className="w-5 h-5 fill-current" /> {t("cta.donateNow")}
+                    </Button>
+                  </Link>
+                  <Link to="/volunteer">
+                    <Button size="lg" variant="outline" className="gap-2 text-base px-8 border-background/40 text-background hover:bg-background/10 backdrop-blur-sm">
+                      {t("home.hero.volunteer")}
+                    </Button>
+                  </Link>
+                  <Link to="/impact">
+                    <Button size="lg" variant="ghost" className="gap-2 text-base text-background/90 hover:text-background hover:bg-background/10">
+                      {t("home.hero.work")} <ArrowRight className="w-4 h-4" />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            );
+          }}
+        </HeroCarousel>
       </section>
 
       <section className="py-16 bg-card border-b border-border">

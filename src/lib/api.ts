@@ -73,6 +73,9 @@ export interface GalleryItem {
 export interface HeroSlide {
   id: string;
   imageUrl: string;
+  title?: string | null;
+  subtitle?: string | null;
+  badge?: string | null;
   sortOrder: number;
   createdAt: string;
 }
@@ -508,10 +511,24 @@ export async function fetchHeroSlides(): Promise<HeroSlide[]> {
   return get<HeroSlide[]>("/hero-slides");
 }
 
-export async function uploadHeroSlide(file: File, onProgress?: (pct: number) => void): Promise<HeroSlide> {
+export async function uploadHeroSlide(
+  file: File,
+  meta?: { title?: string; subtitle?: string; badge?: string },
+  onProgress?: (pct: number) => void
+): Promise<HeroSlide> {
   const form = new FormData();
   form.append("slide", file);
+  if (meta?.title) form.append("title", meta.title);
+  if (meta?.subtitle) form.append("subtitle", meta.subtitle);
+  if (meta?.badge) form.append("badge", meta.badge);
   return uploadWithProgress<HeroSlide>("/hero-slides", form, onProgress);
+}
+
+export async function updateHeroSlide(
+  id: string,
+  data: { title?: string | null; subtitle?: string | null; badge?: string | null }
+): Promise<{ success: boolean; message: string }> {
+  return put(`/hero-slides/${id}`, data);
 }
 
 export async function deleteHeroSlide(id: string): Promise<{ success: boolean; message: string }> {

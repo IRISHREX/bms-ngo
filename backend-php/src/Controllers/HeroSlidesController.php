@@ -23,15 +23,23 @@ class HeroSlidesController {
             @mkdir($this->uploadDir, 0777, true);
         }
 
-        // Auto-create table if not exists
+        // Auto-create table if not exists with title, subtitle, badge
         try {
             $this->db->exec("CREATE TABLE IF NOT EXISTS hero_slides (
                 id INT PRIMARY KEY AUTO_INCREMENT,
                 image_url VARCHAR(500) NOT NULL,
                 file_path VARCHAR(500) NULL,
+                title VARCHAR(255) NULL,
+                subtitle TEXT NULL,
+                badge VARCHAR(100) NULL,
                 sort_order INT DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )");
+
+            // Run safe migration for existing installations
+            try { $this->db->exec("ALTER TABLE hero_slides ADD COLUMN title VARCHAR(255) NULL"); } catch (\Exception $e) {}
+            try { $this->db->exec("ALTER TABLE hero_slides ADD COLUMN subtitle TEXT NULL"); } catch (\Exception $e) {}
+            try { $this->db->exec("ALTER TABLE hero_slides ADD COLUMN badge VARCHAR(100) NULL"); } catch (\Exception $e) {}
         } catch (\Exception $e) {
             // Table may already exist or error ignored
         }
@@ -56,6 +64,9 @@ class HeroSlidesController {
                 $slides[] = [
                     'id' => (string)$r['id'],
                     'imageUrl' => $url,
+                    'title' => !empty($r['title']) ? (string)$r['title'] : null,
+                    'subtitle' => !empty($r['subtitle']) ? (string)$r['subtitle'] : null,
+                    'badge' => !empty($r['badge']) ? (string)$r['badge'] : null,
                     'sortOrder' => (int)($r['sort_order'] ?? 0),
                     'createdAt' => $r['created_at']
                 ];
@@ -114,19 +125,27 @@ class HeroSlidesController {
         $targetPath = $targetFolder . DIRECTORY_SEPARATOR . $filename;
 
         try {
+            $body = $request->getParsedBody() ?? [];
+            $title = !empty($body['title']) ? trim($body['title']) : null;
+            $subtitle = !empty($body['subtitle']) ? trim($body['subtitle']) : null;
+            $badge = !empty($body['badge']) ? trim($body['badge']) : null;
+
             $uploadedFile->moveTo($targetPath);
 
             $imageUrl = $this->getUploadUrl() . '/hero/' . $filename;
             $sortOrder = $total;
 
-            $stmt = $this->db->prepare("INSERT INTO hero_slides (image_url, file_path, sort_order) VALUES (?, ?, ?)");
-            $stmt->execute([$imageUrl, $targetPath, $sortOrder]);
+            $stmt = $this->db->prepare("INSERT INTO hero_slides (image_url, file_path, title, subtitle, badge, sort_order) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$imageUrl, $targetPath, $title, $subtitle, $badge, $sortOrder]);
 
             $id = $this->db->lastInsertId();
 
             $result = [
                 'id' => (string)$id,
                 'imageUrl' => $imageUrl,
+                'title' => $title,
+                'subtitle' => $subtitle,
+                'badge' => $badge,
                 'sortOrder' => $sortOrder,
                 'createdAt' => date('Y-m-d H:i:s')
             ];
@@ -137,6 +156,30 @@ class HeroSlidesController {
             if (file_exists($targetPath)) {
                 @unlink($targetPath);
             }
+            $response->getBody()->write(json_encode(["error" => $e->getMessage()]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(500);
+        }
+    }
+
+    public function update(Request $request, Response $response, $args) {
+        $id = $args['id'] ?? null;
+        if (!$id) {
+            $response->getBody()->write(json_encode(["error" => "Slide ID required."]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+        }
+
+        $body = $request->getParsedBody() ?? [];
+        $title = isset($body['title']) ? trim($body['title']) : null;
+        $subtitle = isset($body['subtitle']) ? trim($body['subtitle']) : null;
+        $badge = isset($body['badge']) ? trim($body['badge']) : null;
+
+        try {
+            $stmt = $this->db->prepare("UPDATE hero_slides SET title = ?, subtitle = ?, badge = ? WHERE id = ?");
+            $stmt->execute([$title, $subtitle, $badge, $id]);
+
+            $response->getBody()->write(json_encode(["message" => "Slide updated successfully", "success" => true]));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(200);
+        } catch (PDOException $e) {
             $response->getBody()->write(json_encode(["error" => $e->getMessage()]));
             return $response->withHeader('Content-Type', 'application/json')->withStatus(500);
         }
